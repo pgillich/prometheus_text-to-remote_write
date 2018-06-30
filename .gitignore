@@ -1,0 +1,12 @@
+*#
+.#*
+
+prometheus_text-to-remote_write
+
+/.build
+/.release
+/.tarballs
+
+!/circle.yml
+!/.travis.yml
+!/.promu.yml
