@@ -13,14 +13,16 @@ import (
 )
 
 const (
-	OPT_RECEIVE_ON = "receive-on"
-	OPT_WRITE_TO   = "write-to"
+	OPT_RECEIVE_ON        = "receive-on"
+	OPT_RECEIVE_PATH_TEXT = "receive-path-text"
+	OPT_WRITE_TO          = "write-to"
 
 	OPT_COPYSTANDARDLOGTO      = "copystandardlogto"
 	OPT_GLOG_COPYSTANDARDLOGTO = "glog." + OPT_COPYSTANDARDLOGTO
 
-	DEFAULT_RECEIVE_ON = ":9099"
-	DEFAULT_WRITE_TO   = "http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus"
+	DEFAULT_RECEIVE_ON        = ":9099"
+	DEFAULT_RECEIVE_PATH_TEXT = "/"
+	DEFAULT_WRITE_TO          = "http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus"
 )
 
 var RootCmd = &cobra.Command{
@@ -50,13 +52,6 @@ func init() {
 		case "logtostderr", "alsologtostderr", "v", "stderrthreshold", "vmodule", "log_backtrace_at", "log_dir":
 			goflag.Usage = goflag.Usage + " (glog)"
 			pflag.CommandLine.AddGoFlag(goflag)
-
-			if goflag.Name == "v" {
-				goflagV = goflag
-			} else {
-				pflag.CommandLine.MarkHidden(goflag.Name)
-			}
-
 			viper.BindPFlag("glog."+goflag.Name, pflag.CommandLine.Lookup(goflag.Name))
 		default:
 			glog.Warningln("Not handled CLI option:", goflag.Name)
