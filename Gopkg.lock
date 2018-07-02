@@ -122,8 +122,8 @@
 [[projects]]
   name = "github.com/prometheus/prometheus"
   packages = ["prompb"]
-  revision = "188ca45bd85ce843071e768d855722a9d9dabe03"
-  version = "v2.3.1"
+  revision = "bc6058c81272a8d938c05e75607371284236aadc"
+  version = "v2.2.1"
 
 [[projects]]
   name = "github.com/spf13/afero"
@@ -256,6 +256,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3bf05daa506ec42903e0bb895cd7d3561c8a6c714ce9547664e254586c231cd0"
+  inputs-digest = "826a95b7a4e09233ea6a54dfcd5ebfa932d0cc05d902732b81df62a88d138c2d"
   solver-name = "gps-cdcl"
   solver-version = 1
