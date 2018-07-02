@@ -201,4 +201,5 @@ gopkg.in/yaml.v2                                  v2.2.1         v2.2.1         
 ```
 
 TODO: merge several timestamps of same metric+lebels combination into one item (see: github.com/prometheus/prometheus/documentation/examples/remote_storage/remote_storage_adapter/influxdb).
+
 TODO: code cleanup

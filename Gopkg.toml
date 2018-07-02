@@ -41,6 +41,10 @@
   name = "github.com/spf13/viper"
   version = "1.0.2"
 
+[[constraint]]
+  name = "github.com/prometheus/prometheus"
+  version = "~2.2.1"
+
 [prune]
   go-tests = true
   unused-packages = true

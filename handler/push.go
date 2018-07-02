@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	//"strings"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	//"github.com/prometheus/prometheus/storage/remote/client"
-	//dto "github.com/prometheus/client_model/go"
+	dto "github.com/prometheus/client_model/go"
 	//"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
 
@@ -43,65 +43,39 @@ func HandlePush(w http.ResponseWriter, req *http.Request) {
 		glog.V(2).Infof("%s: %v\n", util.FUNCTION_NAME_SHORT(), metricFamilies)
 		util.LogObjAsJson(2, metricFamilies, "metricFamilies", true)
 
-		samples := make([]*model.Sample, 0)
-		o := expfmt.DecodeOptions{Timestamp: model.Time(model.Now())}
-		for _, metricFamily := range metricFamilies {
-			sampleVector, _ := expfmt.ExtractSamples(&o, metricFamily)
-			for _, sample := range sampleVector {
-				samples = append(samples, sample)
-			}
-		}
-
-		serverURL, err := url.Parse("http://172.17.0.1:1234/receive" /*viper.GetString(cmd.OPT_WRITE_TO)*/)
-		if err != nil {
-			util.PrintFatalf("Runtime error: %+v\n", err)
-		}
-		glog.V(2).Infof("%v\n", serverURL)
-		c := Client{
-			url:     serverURL,
-			timeout: time.Second,
-		}
-
-		writeRequest := ToWriteRequest(samples)
-		util.LogObjAsJson(2, writeRequest, "writeRequest", true)
-		Store(context.Background(), &c, writeRequest)
-
-		// Method from github.com/prometheus/prometheus/documentation/examples/remote_storage/remote_storage_adapter/influxdb
-		// not finished
-		/*
-			labelsToSeries := map[string]*prompb.TimeSeries{}
-			glog.V(2).Infof("%v\n", labelsToSeries)
-
-			mergeMetrics(labelsToSeries, metricFamilies)
-		*/
-		/*
-			for metric, samples := range metricFamilies {
-				glog.V(2).Infof("%s: metric = %v\n", util.FUNCTION_NAME_SHORT(), metric)
-
-				if _, ok := labelsToSeries[metric]; !ok {
-					glog.V(2).Infof("%v\n", samples)
-				}
-			}
-		*/
-		/*
-			URL_ := config_util.URL{URL: serverURL}
-			Timeout_ := model.Duration(time.Second)
-			glog.V(2).Infof("%v, %v\n", URL_, Timeout_)
-
-			clientConfig := client.ClientConfig{
-				URL:     &URL_,
-				Timeout: Timeout_,
-			}
-			glog.V(2).Infof("%v\n", clientConfig)
-		*/
-		/*
-		   type ClientConfig struct {
-		   	URL              *config_util.URL
-		   	Timeout          model.Duration
-		   	HTTPClientConfig config_util.HTTPClientConfig
-		   }
-		*/
+		//ProcessSamples(metricFamilies)
+		ProcessSeries(metricFamilies)
 	}
+}
+
+// Method from // from github.com/prometheus/prometheus/storage/remote
+
+func ProcessSamples(metricFamilies map[string]*dto.MetricFamily) {
+	samples := make([]*model.Sample, 0)
+	o := expfmt.DecodeOptions{Timestamp: model.Time(model.Now())}
+	for _, metricFamily := range metricFamilies {
+		sampleVector, _ := expfmt.ExtractSamples(&o, metricFamily)
+		glog.V(2).Infof("sampleVector = %v\n", sampleVector)
+		for _, sample := range sampleVector {
+			glog.V(2).Infof("sample = %v\n", sample)
+			samples = append(samples, sample)
+		}
+	}
+
+	serverURL, err := url.Parse("http://172.17.0.1:1234/receive" /*viper.GetString(cmd.OPT_WRITE_TO)*/)
+	if err != nil {
+		util.PrintFatalf("Runtime error: %+v\n", err)
+	}
+	glog.V(2).Infof("%v\n", serverURL)
+
+	c := Client{
+		url:     serverURL,
+		timeout: time.Second,
+	}
+
+	writeRequest := ToWriteRequest(samples)
+	util.LogObjAsJson(2, writeRequest, "writeRequest", true)
+	Store(context.Background(), &c, writeRequest)
 
 }
 
@@ -204,9 +178,45 @@ func MetricToLabelProtos(metric model.Metric) []*prompb.Label {
 }
 
 // Method from github.com/prometheus/prometheus/documentation/examples/remote_storage/remote_storage_adapter/influxdb
-// not finished
 
-/*
+// Timestamp series are listed to labels
+func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
+	labelsToSeries := map[string]*prompb.TimeSeries{}
+	glog.V(2).Infof("%v\n", labelsToSeries)
+
+	mergeMetrics(labelsToSeries, metricFamilies)
+
+	serverURL, err := url.Parse("http://172.17.0.1:1234/receive" /*viper.GetString(cmd.OPT_WRITE_TO)*/)
+	if err != nil {
+		util.PrintFatalf("Runtime error: %+v\n", err)
+	}
+	glog.V(2).Infof("%v\n", serverURL)
+
+	c := Client{
+		url:     serverURL,
+		timeout: time.Second,
+	}
+
+	writeRequest := SeriesToWriteRequest(labelsToSeries)
+	util.LogObjAsJson(2, writeRequest, "writeRequest", true)
+	Store(context.Background(), &c, writeRequest)
+}
+
+func SeriesToWriteRequest(series map[string]*prompb.TimeSeries) *prompb.WriteRequest {
+	req := &prompb.WriteRequest{
+		Timeseries: make([]*prompb.TimeSeries, 0, len(series)),
+	}
+
+	for _, s := range series {
+		glog.V(2).Infof("serie %v\n", s)
+		req.Timeseries = append(req.Timeseries, s)
+	}
+
+	return req
+}
+
+// Method from github.com/prometheus/prometheus/documentation/examples/remote_storage/remote_storage_adapter/influxdb
+// Modified func of client.go:mergeResult
 func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies map[string]*dto.MetricFamily) error {
 	for _, m := range metricFamilies {
 		name := m.GetName()
@@ -252,7 +262,7 @@ func tagsToLabelPairs(name string, labels []*dto.LabelPair) []*prompb.Label {
 	})
 	return pairs
 }
-*/
+
 /*
 func tagsToLabelPairs(name string, tags []*dto.LabelPair) []*prompb.Label {
 	pairs := make([]*prompb.Label, 0, len(tags))
@@ -278,7 +288,7 @@ func tagsToLabelPairs(name string, tags []*dto.LabelPair) []*prompb.Label {
 	return pairs
 }
 */
-/*
+
 func concatLabels(name string, labels []*dto.LabelPair) string {
 	// 0xff cannot cannot occur in valid UTF-8 sequences, so use it
 	// as a separator here.
@@ -292,6 +302,7 @@ func concatLabels(name string, labels []*dto.LabelPair) string {
 	return strings.Join(pairs, separator)
 }
 
+/*
 func valuesToSamples(values [][]interface{}) ([]*prompb.Sample, error) {
 	samples := make([]*prompb.Sample, 0, len(values))
 	for _, v := range values {
