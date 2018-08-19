@@ -15,7 +15,7 @@ import (
 
 	"github.com/golang/glog"
 
-	//"github.com/spf13/viper"
+	"github.com/spf13/viper"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
@@ -29,7 +29,7 @@ import (
 	//"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
 
-	//"github.com/pgillich/prometheus_text-to-remote_write/cmd"
+	"github.com/pgillich/prometheus_text-to-remote_write/conf"
 	"github.com/pgillich/prometheus_text-to-remote_write/util"
 )
 
@@ -62,7 +62,7 @@ func ProcessSamples(metricFamilies map[string]*dto.MetricFamily) {
 		}
 	}
 
-	serverURL, err := url.Parse("http://172.17.0.1:1234/receive" /*viper.GetString(cmd.OPT_WRITE_TO)*/)
+	serverURL, err := url.Parse(viper.GetString(conf.OPT_WRITE_TO))
 	if err != nil {
 		util.PrintFatalf("Runtime error: %+v\n", err)
 	}
@@ -186,7 +186,7 @@ func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
 
 	mergeMetrics(labelsToSeries, metricFamilies)
 
-	serverURL, err := url.Parse("http://172.17.0.1:1234/receive" /*viper.GetString(cmd.OPT_WRITE_TO)*/)
+	serverURL, err := url.Parse(viper.GetString(conf.OPT_WRITE_TO))
 	if err != nil {
 		util.PrintFatalf("Runtime error: %+v\n", err)
 	}
