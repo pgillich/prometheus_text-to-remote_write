@@ -1,6 +1,7 @@
 *#
 .#*
 
+*.debug
 prometheus_text-to-remote_write
 
 /.build
