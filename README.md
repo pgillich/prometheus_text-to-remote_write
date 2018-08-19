@@ -83,7 +83,7 @@ Received text is converted to object representation by github.com/prometheus/com
 }
 ```
 
-Imported object is transformed to protobuf data by github.com/prometheus/common/expfmt/decode.go github.com/prometheus/prometheus/storage/remote/codec.go, and  for example (in JSON):
+Imported object is transformed to protobuf data by github.com/prometheus/common/expfmt/decode.go and github.com/prometheus/prometheus/storage/remote/codec.go, for example (in JSON):
 ```
 {
   "timeseries": [
@@ -163,7 +163,7 @@ It can be tested by github.com/prometheus/prometheus/documentation/examples/remo
 ```
 ~/go/src/github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter$ ./example_write_adapter
 
-~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --v 2 --logtostderr
+~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --write-to "http://179.17.0.1:1234/receive" --v 2 --logtostderr
 
 ~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @test/data/sample-2.txt localhost:9099
 ```

@@ -9,20 +9,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/pgillich/prometheus_text-to-remote_write/conf"
 	"github.com/pgillich/prometheus_text-to-remote_write/util"
-)
-
-const (
-	OPT_RECEIVE_ON        = "receive-on"
-	OPT_RECEIVE_PATH_TEXT = "receive-path-text"
-	OPT_WRITE_TO          = "write-to"
-
-	OPT_COPYSTANDARDLOGTO      = "copystandardlogto"
-	OPT_GLOG_COPYSTANDARDLOGTO = "glog." + OPT_COPYSTANDARDLOGTO
-
-	DEFAULT_RECEIVE_ON        = ":9099"
-	DEFAULT_RECEIVE_PATH_TEXT = "/"
-	DEFAULT_WRITE_TO          = "http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus"
 )
 
 var RootCmd = &cobra.Command{
@@ -61,10 +49,10 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// see https://godoc.org/github.com/golang/glog#CopyStandardLogTo
-	RootCmd.PersistentFlags().String(OPT_COPYSTANDARDLOGTO, "INFO", "Calling CopyStandardLogTo with this option (glog)")
-	copystandardlogtoFlag := RootCmd.PersistentFlags().Lookup(OPT_COPYSTANDARDLOGTO)
+	RootCmd.PersistentFlags().String(conf.OPT_COPYSTANDARDLOGTO, "INFO", "Calling CopyStandardLogTo with this option (glog)")
+	copystandardlogtoFlag := RootCmd.PersistentFlags().Lookup(conf.OPT_COPYSTANDARDLOGTO)
 	copystandardlogtoFlag.Hidden = true
-	viper.BindPFlag(OPT_GLOG_COPYSTANDARDLOGTO, copystandardlogtoFlag)
+	viper.BindPFlag(conf.OPT_GLOG_COPYSTANDARDLOGTO, copystandardlogtoFlag)
 
 	cobra.OnInitialize()
 
