@@ -42,5 +42,6 @@ func startListening() {
 	http.Handle(viper.GetString(conf.OPT_RECEIVE_PATH_TEXT), http.HandlerFunc(handler.HandlePush))
 
 	glog.Infoln("Receiving on", receiveOnAddr)
+	glog.V(2).Infof("V=2")
 	http.ListenAndServe(receiveOnAddr, nil)
 }

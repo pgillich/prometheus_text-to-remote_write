@@ -2,7 +2,7 @@ package conf
 
 const (
 	OPT_RECEIVE_ON        = "receive-on"
-	OPT_RECEIVE_PATH_TEXT = "receive-path-text"
+	OPT_RECEIVE_PATH_TEXT = "receive-path"
 	OPT_WRITE_TO          = "write-to"
 
 	OPT_COPYSTANDARDLOGTO      = "copystandardlogto"
