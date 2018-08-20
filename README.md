@@ -46,21 +46,21 @@ github.com/hashicorp/hcl                          branch master  branch master  
 github.com/inconshreveable/mousetrap              v1.0           v1.0           76626ae   v1.0     1   
 github.com/magiconair/properties                  v1.8.0         v1.8.0         c235336   v1.8.0   1   
 github.com/matttproud/golang_protobuf_extensions  v1.0.1         v1.0.1         c12348c   v1.0.1   1   
-github.com/mitchellh/mapstructure                 branch master  branch master  bb74f1d   bb74f1d  1   
+github.com/mitchellh/mapstructure                 branch master  branch master  bb74f1d   f15292f  1   
 github.com/pelletier/go-toml                      v1.2.0         v1.2.0         c01d127   v1.2.0   1   
-github.com/prometheus/client_model                branch master  branch master  99fa1f4   99fa1f4  1   
-github.com/prometheus/common                      branch master  branch master  7600349   7600349  3   
-github.com/prometheus/prometheus                  v2.3.1         v2.3.1         188ca45   v2.3.1   1   
+github.com/prometheus/client_model                branch master  branch master  99fa1f4   5c3871d  1   
+github.com/prometheus/common                      branch master  branch master  7600349   c7de230  3   
+github.com/prometheus/prometheus                  ~2.2.1         v2.2.1         bc6058c   v2.2.1   1   
 github.com/spf13/afero                            v1.1.1         v1.1.1         787d034   v1.1.1   2   
 github.com/spf13/cast                             v1.2.0         v1.2.0         8965335   v1.2.0   1   
 github.com/spf13/cobra                            ^0.0.3         v0.0.3         ef82de7   v0.0.3   1   
-github.com/spf13/jwalterweatherman                branch master  branch master  7c0cea3   7c0cea3  1   
-github.com/spf13/pflag                            ^1.0.1         v1.0.1         583c0c0   v1.0.1   1   
-github.com/spf13/viper                            ^1.0.2         v1.0.2         b5e8006   v1.0.2   1   
-golang.org/x/net                                  branch master  branch master  4cb1c02   4cb1c02  8   
-golang.org/x/sys                                  branch master  branch master  7138fd3   7138fd3  1   
+github.com/spf13/jwalterweatherman                branch master  branch master  7c0cea3   14d3d4c  1   
+github.com/spf13/pflag                            ^1.0.1         v1.0.1         583c0c0   v1.0.2   1   
+github.com/spf13/viper                            ^1.0.2         v1.0.2         b5e8006   v1.1.0   1   
+golang.org/x/net                                  branch master  branch master  4cb1c02   aaf6012  8   
+golang.org/x/sys                                  branch master  branch master  7138fd3   1c95834  1   
 golang.org/x/text                                 v0.3.0         v0.3.0         f21a4df   v0.3.0   14  
-google.golang.org/genproto                        branch master  branch master  ff3583e   ff3583e  2   
+google.golang.org/genproto                        branch master  branch master  ff3583e   c66870c  2   
 google.golang.org/grpc                            v1.13.0        v1.13.0        168a619   v1.13.0  25  
 gopkg.in/yaml.v2                                  v2.2.1         v2.2.1         5420a8b   v2.2.1   1   
 ```
