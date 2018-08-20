@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/pgillich/prometheus_text-to-remote_write/util"
 )
 
 var convertCmd = &cobra.Command{
@@ -17,9 +19,8 @@ Example commands:
 
 func init() {
 	RootCmd.AddCommand(convertCmd)
-
 }
 
 func startConvert() {
-
+	util.PrintFatalf("NOT IMPLEMENTED\n")
 }

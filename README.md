@@ -20,13 +20,56 @@ storage_used_p{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",
 
 The service sends data to target on Prometheus remote_write protocol.
 
+# Usage
+
+Service can be started as a container, for example (with default env variables):
+```
+docker run --rm --env RECEIVE_ON=':9099' --env RECEIVE_PATH='/' \
+    --env WRITE_TO='http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus' --env GLOG_V=0 \
+	pgillich/prometheus_text-to-remote_write:vA.B
+```
+Where A.B is the version number and RECEIVE_ON is built from RECEIVE_PORT by following expression: `":${RECEIVE_PORT}"`
+
+Example for starting container for testing, see [Testing](#Testing) below:
+```
+docker run --rm --env WRITE_TO="http://172.17.0.1:1234/receive" --env GLOG_V=2 pgillich/prometheus_text-to-remote_write:vA.B
+```
+
+Mapping CLI options to environment variables (including Glog):
+
+| CLI option | Environment variable |
+| --- | --- |
+| receive-on | RECEIVE_ON |
+| receive-path | RECEIVE_PATH |
+| write-to | WRITE_TO |
+| v | GLOG_V |
+| alsologtostderr | GLOG_ALSOLOGTOSTDERR |
+| log_backtrace_at | GLOG_LOG_BACKTRACE_AT |
+| log_dir | GLOG_LOG_DIR |
+| logtostderr | GLOG_LOGTOSTDERR |
+| stderrthreshold | GLOG_STDERRTHRESHOLD |
+| vmodule | GLOG_VMODULE |
+
+# Build
+
+Docker image can be built by following command:
+```
+docker build -t pgillich/prometheus_text-to-remote_write:vA.B .
+```
+Where A.B is the version number
+
+Binary executable can be built by following command:
+```
+go build
+```
+
 # Testing
 
-It can be tested without any real DB backend by github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter, for example (in separated shells):
+Binary executable can be tested without any real DB backend by github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter, for example (in separated shells):
 ```
 ~/go/src/github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter$ ./example_write_adapter
 
-~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --write-to "http://172.17.0.1:1234/receive" --v 2 --logtostderr
+~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --write-to "http://172.17.0.1:1234/receive" --v 2
 
 ~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @test/data/sample-2.txt localhost:9099
 ```
