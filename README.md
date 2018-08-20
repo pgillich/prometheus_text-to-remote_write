@@ -1,165 +1,28 @@
-# prometheus_text-to-remote_write
+# Prometheus text to remote_write
+
 It's a microservice receiving Prometheus text exposition format and sending to Prometheus remote_write
+
+Received text is converted to object representation by Prometheus expfmt library.
+Imported objects are transformed to Prometheus protobuf format by Prometheus libraries,
+following Prometheus remote_storage_adapter example for InfluxDB.
+
+See more details at [Details](doc/details.md).
+
+# Protocols
 
 The service expects Prometheus text expose format, described here: https://prometheus.io/docs/instrumenting/exposition_formats/
 
-Example for the received input:
+Example for the receiving input:
 ```
 storage_used{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",Mount="/"} 3756675072 1484564635000
 storage_used_p{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",Mount="/"} 7.1 1484564635000
 ```
 
-Received text is converted to object representation by github.com/prometheus/common/expfmt/text_parse/goTextToMetricFamilies, for example (in JSON):
-```
-{
-  "storage_used": {
-    "name": "storage_used",
-    "type": 3,
-    "metric": [
-      {
-        "label": [
-          {
-            "name": "DC",
-            "value": "operator.com"
-          },
-          {
-            "name": "Network",
-            "value": "prom-lab"
-          },
-          {
-            "name": "Region",
-            "value": "R170"
-          },
-          {
-            "name": "Host",
-            "value": "host-1"
-          },
-          {
-            "name": "Mount",
-            "value": "/"
-          }
-        ],
-        "untyped": {
-          "value": 3756675072
-        },
-        "timestamp_ms": 1484564635000
-      }
-    ]
-  },
-  "storage_used_p": {
-    "name": "storage_used_p",
-    "type": 3,
-    "metric": [
-      {
-        "label": [
-          {
-            "name": "DC",
-            "value": "operator.com"
-          },
-          {
-            "name": "Network",
-            "value": "prom-lab"
-          },
-          {
-            "name": "Region",
-            "value": "R170"
-          },
-          {
-            "name": "Host",
-            "value": "host-1"
-          },
-          {
-            "name": "Mount",
-            "value": "/"
-          }
-        ],
-        "untyped": {
-          "value": 7.1
-        },
-        "timestamp_ms": 1484564635000
-      }
-    ]
-  }
-}
-```
+The service sends data to target on Prometheus remote_write protocol.
 
-Imported object is transformed to protobuf data by github.com/prometheus/common/expfmt/decode.go and github.com/prometheus/prometheus/storage/remote/codec.go, for example (in JSON):
-```
-{
-  "timeseries": [
-    {
-      "labels": [
-        {
-          "name": "DC",
-          "value": "operator.com"
-        },
-        {
-          "name": "Host",
-          "value": "host-1"
-        },
-        {
-          "name": "Mount",
-          "value": "/"
-        },
-        {
-          "name": "Network",
-          "value": "prom-lab"
-        },
-        {
-          "name": "Region",
-          "value": "R170"
-        },
-        {
-          "name": "__name__",
-          "value": "storage_used"
-        }
-      ],
-      "samples": [
-        {
-          "value": 3756675072,
-          "timestamp": 1484564635000
-        }
-      ]
-    },
-    {
-      "labels": [
-        {
-          "name": "DC",
-          "value": "operator.com"
-        },
-        {
-          "name": "Host",
-          "value": "host-1"
-        },
-        {
-          "name": "Mount",
-          "value": "/"
-        },
-        {
-          "name": "Network",
-          "value": "prom-lab"
-        },
-        {
-          "name": "Region",
-          "value": "R170"
-        },
-        {
-          "name": "__name__",
-          "value": "storage_used_p"
-        }
-      ],
-      "samples": [
-        {
-          "value": 7.1,
-          "timestamp": 1484564635000
-        }
-      ]
-    }
-  ]
-}
-```
+# Testing
 
-It can be tested by github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter, for example (in separated shells):
+It can be tested without any real DB backend by github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter, for example (in separated shells):
 ```
 ~/go/src/github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter$ ./example_write_adapter
 
@@ -167,6 +30,8 @@ It can be tested by github.com/prometheus/prometheus/documentation/examples/remo
 
 ~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @test/data/sample-2.txt localhost:9099
 ```
+
+# Version info
 
 Output of dep status:
 ```
@@ -199,5 +64,3 @@ google.golang.org/genproto                        branch master  branch master  
 google.golang.org/grpc                            v1.13.0        v1.13.0        168a619   v1.13.0  25  
 gopkg.in/yaml.v2                                  v2.2.1         v2.2.1         5420a8b   v2.2.1   1   
 ```
-
-TODO: code cleanup
