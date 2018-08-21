@@ -6,7 +6,9 @@ Received text is converted to object representation by Prometheus expfmt library
 Imported objects are transformed to Prometheus protobuf format by Prometheus libraries,
 following Prometheus remote_storage_adapter example for InfluxDB.
 
-See more details at [Details](doc/details.md).
+See background info at [Details](doc/details.md).
+
+Docker images are pushed to Docker hub: [pgillich/prometheus_text-to-remote_write](https://hub.docker.com/r/pgillich/prometheus_text-to-remote_write/)
 
 # Protocols
 
@@ -24,15 +26,15 @@ The service sends data to target on Prometheus remote_write protocol.
 
 Service can be started as a container, for example (with default env variables):
 ```
-docker run --rm --env RECEIVE_ON=':9099' --env RECEIVE_PATH='/' \
+docker run --rm -P --env RECEIVE_ON=':9099' --env RECEIVE_PATH='/' \
     --env WRITE_TO='http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus' --env GLOG_V=0 \
-	pgillich/prometheus_text-to-remote_write:vA.B
+	pgillich/prometheus_text-to-remote_write
 ```
-Where A.B is the version number and RECEIVE_ON is built from RECEIVE_PORT by following expression: `":${RECEIVE_PORT}"`
+The default exposed port is 9099.
 
 Example for starting container for testing, see [Testing](#Testing) below:
 ```
-docker run --rm --env WRITE_TO="http://172.17.0.1:1234/receive" --env GLOG_V=2 pgillich/prometheus_text-to-remote_write:vA.B
+docker run --rm -P --env WRITE_TO="http://172.17.0.1:1234/receive" --env GLOG_V=2 pgillich/prometheus_text-to-remote_write
 ```
 
 Mapping CLI options to environment variables (including Glog):
@@ -73,6 +75,7 @@ Binary executable can be tested without any real DB backend by github.com/promet
 
 ~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @test/data/sample-2.txt localhost:9099
 ```
+If it runs in container, the target address should be the container IP address, instead of `localhost`.
 
 # Version info
 
