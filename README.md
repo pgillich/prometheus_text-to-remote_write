@@ -56,6 +56,21 @@ Mapping CLI options to environment variables (including Glog):
 | stderrthreshold | GLOG_STDERRTHRESHOLD |
 | vmodule | GLOG_VMODULE |
 
+# Repo config
+
+A subdirectory from Prometheus repo (prometheus/documentation/examples/remote_storage/example_write_adapter) is linked for making test target.
+FYI, below commands were executed (you don't have to do it):
+```
+git clone https://github.com/pgillich/prometheus_text-to-remote_write.git
+cd prometheus_text-to-remote_write/
+git remote add -f -t release-2.2 --no-tags prometheus https://github.com/prometheus/prometheus.git
+git read-tree --prefix=example_write_adapter/ -u prometheus/release-2.2:documentation/examples/remote_storage/example_write_adapter
+git add .
+git commit -m 'Linking Prometheus example_write_adapter'
+git push
+```
+See more details: https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree
+
 # Build
 
 Docker image can be built by following command:
