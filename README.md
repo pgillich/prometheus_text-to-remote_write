@@ -10,6 +10,8 @@ See background info at [Details](doc/details.md).
 
 Docker images are pushed to Docker hub: [pgillich/prometheus_text-to-remote_write](https://hub.docker.com/r/pgillich/prometheus_text-to-remote_write/)
 
+*It's in alpha phase. No automatic tests and source code should be refactored. If you would like to improve it, you are welcomed! ;-)*
+
 # Protocols
 
 The service expects Prometheus text expose format, described here: https://prometheus.io/docs/instrumenting/exposition_formats/
