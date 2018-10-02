@@ -2,7 +2,7 @@
 
 It's a microservice receiving Prometheus text exposition format and sending to Prometheus remote_write.
 
-The interest of this project is importing old (1-day, 1-year) values into Prometheus for making offline analysis. Limitations of Pushgateway incoming format (timestamp is not enabled) and scraper (older than 5-minutes values aren't processed by Prometheus) don't give 'legal' way to import old measurements. There is a 'semi-legal' way to import it: sendig data directly to the Prometheus DB by remote_write protocol.
+The interest of this project is importing old (1-day, 1-year) values into Prometheus for making offline analysis. Limitations of Pushgateway incoming format (timestamp is not enabled) and scraper (older than 5-minute values aren't processed by Prometheus) don't give 'legal' way to import old measurements. There is a 'semi-legal' way to import it: sendig data directly to the Prometheus DB by remote_write protocol.
 
 Received text is converted to object representation by Prometheus expfmt library.
 Imported objects are transformed to Prometheus protobuf format by Prometheus libraries,
