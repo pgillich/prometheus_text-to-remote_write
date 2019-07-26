@@ -26,6 +26,17 @@ storage_used_p{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",
 
 The service sends data to target on Prometheus remote_write protocol.
 
+# Supported metric types
+
+Below metric types are supported:
+* Counter
+* Gauge
+* Untyped (Counter or Gauge)
+
+Below metric types are NOT supported:
+* Histogram
+* Summary
+
 # Usage
 
 Service can be started as a container, for example (with default env variables):

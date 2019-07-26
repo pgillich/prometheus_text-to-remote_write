@@ -4,6 +4,8 @@
 *.debug
 prometheus_text-to-remote_write
 
+.vscode
+
 /.build
 /.release
 /.tarballs

@@ -15,6 +15,7 @@ import (
 	//config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+
 	//"github.com/prometheus/prometheus/storage/remote/client"
 	dto "github.com/prometheus/client_model/go"
 	//"github.com/prometheus/prometheus/pkg/timestamp"
@@ -89,7 +90,14 @@ func SeriesToWriteRequest(series map[string]*prompb.TimeSeries) *prompb.WriteReq
 func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies map[string]*dto.MetricFamily) error {
 	for _, m := range metricFamilies {
 		name := m.GetName()
-		glog.V(2).Infof("%s: name = %v\n", util.FUNCTION_NAME_SHORT(), name)
+		glog.V(2).Infof("%s: name = %v (%v)\n", util.FUNCTION_NAME_SHORT(), name, m.String())
+		switch m.GetType() {
+		case dto.MetricType_HISTOGRAM, dto.MetricType_SUMMARY:
+			glog.Warningf("%s: Not supported metric type: %v, %v\n", util.FUNCTION_NAME_SHORT(),
+				m.String(), m,
+			)
+			continue
+		}
 		for _, s := range m.GetMetric() {
 			glog.V(2).Infof("%s: s.GetLabel() = %v\n", util.FUNCTION_NAME_SHORT(), s.GetLabel())
 			k := concatLabels(name, s.GetLabel())
@@ -102,11 +110,21 @@ func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies m
 				labelsToSeries[k] = ts
 			}
 
+			value := float64(0)
+			switch m.GetType() {
+			case dto.MetricType_COUNTER:
+				value = s.GetCounter().GetValue()
+			case dto.MetricType_GAUGE:
+				value = s.GetGauge().GetValue()
+			case dto.MetricType_UNTYPED:
+				value = s.GetUntyped().GetValue()
+			}
+
 			ts.Samples = append(ts.Samples, &prompb.Sample{
 				Timestamp: s.GetTimestampMs(),
-				Value:     s.GetUntyped().GetValue(),
+				Value:     value,
 			})
-			glog.V(2).Infof("%s: ts = %v\n", util.FUNCTION_NAME_SHORT(), ts)
+			glog.V(2).Infof("%s: ts = %v (%v)\n", util.FUNCTION_NAME_SHORT(), ts, m.String())
 		}
 		glog.V(2).Infof("%s:\n labelsToSeries = %v\n\n", util.FUNCTION_NAME_SHORT(), labelsToSeries)
 

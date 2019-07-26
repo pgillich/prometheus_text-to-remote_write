@@ -1,0 +1,5 @@
+# HELP frotz_processed_bytes Number of bytes processed
+# TYPE frotz_processed_bytes counter
+frotz_processed_bytes{host="192.168.10.55"} 22800 1563321600000
+frotz_processed_bytes{host="192.168.10.55"} 45600 1563325200000
+frotz_processed_bytes{host="192.168.10.55"} 68400 1563328800000
