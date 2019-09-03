@@ -120,7 +120,7 @@ func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies m
 				value = s.GetUntyped().GetValue()
 			}
 
-			ts.Samples = append(ts.Samples, &prompb.Sample{
+			ts.Samples = append(ts.Samples, prompb.Sample{
 				Timestamp: s.GetTimestampMs(),
 				Value:     value,
 			})
