@@ -103,7 +103,7 @@ Binary executable can be tested without any real DB backend by github.com/promet
 
 ~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --write-to "http://172.17.0.1:1234/receive" --v 2
 
-~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @test/data/sample-2.txt localhost:9099
+~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @testdata/sample-2.txt localhost:9099
 ```
 If it runs in container, the target address should be the container IP address, instead of `localhost`.
 
