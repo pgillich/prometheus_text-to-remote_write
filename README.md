@@ -74,8 +74,8 @@ FYI, below commands were executed (you don't have to do it):
 ```
 git clone https://github.com/pgillich/prometheus_text-to-remote_write.git
 cd prometheus_text-to-remote_write/
-git remote add -f -t release-2.2 --no-tags prometheus https://github.com/prometheus/prometheus.git
-git read-tree --prefix=example_write_adapter/ -u prometheus/release-2.2:documentation/examples/remote_storage/example_write_adapter
+git remote add -f -t release-2.11 --no-tags prometheus https://github.com/prometheus/prometheus.git
+git read-tree --prefix=example_write_adapter/ -u prometheus/release-2.11:documentation/examples/remote_storage/example_write_adapter
 git add .
 git commit -m 'Linking Prometheus example_write_adapter'
 git push
