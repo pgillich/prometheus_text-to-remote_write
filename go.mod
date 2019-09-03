@@ -8,9 +8,9 @@ require (
 	github.com/golang/snappy v0.0.1
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.6.0
-	github.com/prometheus/prometheus v2.5.0+incompatible
+	github.com/prometheus/prometheus v2.11.2+incompatible
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
-	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
+	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
 )

@@ -42,7 +42,7 @@ func HandlePush(w http.ResponseWriter, req *http.Request) {
 
 // Timestamp series are listed to labels
 func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
-	labelsToSeries := map[string]*prompb.TimeSeries{}
+	labelsToSeries := map[string]prompb.TimeSeries{}
 
 	mergeMetrics(labelsToSeries, metricFamilies)
 
@@ -72,9 +72,9 @@ func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
 }
 
 // Idea from github.com/prometheus/prometheus/storage/remote/codec.go:ToWriteRequest
-func SeriesToWriteRequest(series map[string]*prompb.TimeSeries) *prompb.WriteRequest {
+func SeriesToWriteRequest(series map[string]prompb.TimeSeries) *prompb.WriteRequest {
 	req := &prompb.WriteRequest{
-		Timeseries: make([]*prompb.TimeSeries, 0, len(series)),
+		Timeseries: make([]prompb.TimeSeries, 0, len(series)),
 	}
 
 	for _, s := range series {
@@ -87,7 +87,7 @@ func SeriesToWriteRequest(series map[string]*prompb.TimeSeries) *prompb.WriteReq
 
 // Idea from github.com/prometheus/prometheus/documentation/
 //           examples/remote_storage/remote_storage_adapter/influxdb/client.go:mergeResult
-func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies map[string]*dto.MetricFamily) error {
+func mergeMetrics(labelsToSeries map[string]prompb.TimeSeries, metricFamilies map[string]*dto.MetricFamily) error {
 	for _, m := range metricFamilies {
 		name := m.GetName()
 		glog.V(2).Infof("%s: name = %v (%v)\n", util.FUNCTION_NAME_SHORT(), name, m.String())
@@ -104,7 +104,7 @@ func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies m
 			glog.V(2).Infof("%s: k = %v\n", util.FUNCTION_NAME_SHORT(), k)
 			ts, ok := labelsToSeries[k]
 			if !ok {
-				ts = &prompb.TimeSeries{
+				ts = prompb.TimeSeries{
 					Labels: tagsToLabelPairs(name, s.GetLabel()),
 				}
 				labelsToSeries[k] = ts
@@ -137,15 +137,15 @@ func mergeMetrics(labelsToSeries map[string]*prompb.TimeSeries, metricFamilies m
 
 // Idea from github.com/prometheus/prometheus/documentation/
 //           examples/remote_storage/remote_storage_adapter/influxdb/client.go:tagsToLabelPairs
-func tagsToLabelPairs(name string, labels []*dto.LabelPair) []*prompb.Label {
-	pairs := make([]*prompb.Label, 0, len(labels)+1)
+func tagsToLabelPairs(name string, labels []*dto.LabelPair) []prompb.Label {
+	pairs := make([]prompb.Label, 0, len(labels)+1)
 	for _, kv := range labels {
-		pairs = append(pairs, &prompb.Label{
+		pairs = append(pairs, prompb.Label{
 			Name:  kv.GetName(),
 			Value: kv.GetValue(),
 		})
 	}
-	pairs = append(pairs, &prompb.Label{
+	pairs = append(pairs, prompb.Label{
 		Name:  model.MetricNameLabel,
 		Value: name,
 	})
