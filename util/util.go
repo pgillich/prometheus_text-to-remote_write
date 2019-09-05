@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 
@@ -10,8 +11,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	
-	"github.com/mitchellh/mapstructure"	
 )
 
 func FUNCTION_NAME() string {
@@ -54,7 +53,6 @@ func LogObjAsJson(level glog.Level, obj interface{}, name string, indent bool) {
 	}
 }
 
-
 type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
@@ -63,11 +61,13 @@ type causer interface {
 	Cause() error
 }
 
+// dummyState is a dummy fmt.State implementation
 type dummyState struct {
 	str   strings.Builder
 	flags map[int]bool
 }
 
+// Write pass trough strings.Builder
 func (ds *dummyState) Write(b []byte) (n int, err error) {
 	return ds.str.Write(b)
 }
@@ -82,7 +82,7 @@ func (*dummyState) Precision() (prec int, ok bool) {
 	return 0, false
 }
 
-// Flag not implemented
+// Flag returns dummyState.flags
 func (ds *dummyState) Flag(c int) bool {
 	if f, ok := ds.flags[c]; ok {
 		return f
@@ -96,67 +96,16 @@ func BuildErrorsLists(err error) ([]string, []string) {
 	var messages []string
 	var trace []string
 
+	const depth = 64
+	var pcs [depth]uintptr
+	callers := runtime.Callers(3, pcs[:])
+
 	for err != nil {
-
-		result := map[string]interface{}{}
-
-		errX := mapstructure.Decode(err, &result)
-		fmt.Printf("Decode: %+x\n", errX)
-
 		if stackErr, ok := err.(stackTracer); ok {
-			trace = buildStackTraceList(stackErr)
+			trace = buildStackTraceList(stackErr, callers)
 		}
 
-		if goStringerErr, ok := err.(fmt.GoStringer); ok {
-			fmt.Println("GoStringer: ", goStringerErr.GoString())
-		} else {
-			fmt.Println("GoStringer: NO")
-		}
-
-		if stringerErr, ok := err.(fmt.Stringer); ok {
-			fmt.Println("Stringer: ", stringerErr.String())
-		} else {
-			fmt.Println("Stringer: NO")
-		}
-
-		err2 := error(err)
-		fmt.Println("err2: ", err2)
-
-		if formatterErr, ok := err.(fmt.Formatter); ok {
-			ds := dummyState{}
-			/*
-				formatterErr.Format(&ds, 's')
-				fmt.Printf("Formatter: Format s; %s\n.\n", ds.str.String())
-
-				ds = dummyState{}
-				formatterErr.Format(&ds, 'v')
-				fmt.Printf("Formatter: Format v; %s\n.\n", ds.str.String())
-			*/
-			ds = dummyState{flags: map[int]bool{
-				'+': true,
-			}}
-			formatterErr.Format(&ds, 'v')
-			fmt.Printf("Formatter: Format +v; %s\n.\n", ds.str.String())
-
-			ds = dummyState{flags: map[int]bool{
-				'#': true,
-			}}
-			formatterErr.Format(&ds, 'v')
-			fmt.Printf("Formatter: Format #v; %s\n.\n", ds.str.String())
-
-			fmt.Printf("Formatter: s %s\n.\n", err)
-			fmt.Printf("Formatter: v %v\n.\n", err)
-			fmt.Printf("Formatter: +v %+v\n.\n", err)
-			fmt.Printf("Formatter: #v %#v\n.\n", err)
-			fmt.Printf("Formatter: q %q\n.\n", err)
-			fmt.Printf("Formatter: d %d\n.\n", err)
-		} else {
-			fmt.Println("Formatter: OK")
-		}
-
-		fmt.Println("Error: ", err.Error())
-
-		m := err.Error()
+		m := getErrMsg(err)
 		messages = append(messages, m)
 
 		if causeErr, ok := err.(causer); ok {
@@ -169,12 +118,62 @@ func BuildErrorsLists(err error) ([]string, []string) {
 	return messages, trace
 }
 
-func buildStackTraceList(trace stackTracer) []string {
+func buildStackTraceList(trace stackTracer, skip int) []string {
 	var traceList []string
 
-	for t := range trace.StackTrace() { // Format
-		traceList = append(traceList, fmt.Sprintf("%+v", t))
+	tracesAll := trace.StackTrace()
+	traces := tracesAll[:len(tracesAll)-skip]
+	for _, t := range traces {
+		ds := dummyState{}
+		t.Format(&ds, 's')
+		ds.str.WriteString("#")
+		t.Format(&ds, 'd')
+		ds.str.WriteString(":")
+		t.Format(&ds, 'n')
+		ds.str.WriteString("()")
+
+		traceList = append(traceList, ds.str.String())
 	}
 
 	return traceList
+}
+
+func getErrMsg(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	if msg := getFieldValue(err, "msg"); msg != nil {
+		return *msg
+	}
+
+	return err.Error()
+}
+
+func getFieldValue(input interface{}, keyName string) *string {
+	var inputVal reflect.Value
+	if input != nil {
+		inputVal = reflect.ValueOf(input)
+
+		if inputVal.Kind() == reflect.Ptr && inputVal.IsNil() {
+			input = nil
+		}
+	}
+
+	if input == nil || !inputVal.IsValid() {
+		return nil
+	}
+
+	dataVal := reflect.Indirect(reflect.ValueOf(input))
+	if dataVal.Kind() == reflect.Struct {
+		typ := dataVal.Type()
+		for i := 0; i < typ.NumField(); i++ {
+			if typ.Field(i).Name == keyName {
+				msg := dataVal.Field(i).String()
+				return &msg
+			}
+		}
+	}
+
+	return nil
 }
