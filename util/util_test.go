@@ -191,8 +191,8 @@ func testStructMsg(t *testing.T,
 }
 
 func TestStructMsg(t *testing.T) {
-	testStructMsg(t, `mess{"s":"{i:4 s:str}","x":"3","y":"4"}`,
-		"mess",
+	testStructMsg(t, `mess a ge{"s":"{i:4 s:str}","x":"3","y":"4"}`,
+		"mess a ge",
 		"x", 3,
 		"y", "4",
 		"s", sampleStruct{i: 4, s: "str"},
@@ -200,35 +200,35 @@ func TestStructMsg(t *testing.T) {
 }
 
 func TestStructMsg_0(t *testing.T) {
-	testStructMsg(t, `mess{}`,
-		"mess",
+	testStructMsg(t, `mess a ge{}`,
+		"mess a ge",
 	)
 }
 
 func TestStructMsg_1(t *testing.T) {
-	testStructMsg(t, `mess{"x":""}`,
-		"mess",
+	testStructMsg(t, `mess a ge{"x":""}`,
+		"mess a ge",
 		"x",
 	)
 }
 
 func TestStructMsg_1_nil(t *testing.T) {
-	testStructMsg(t, `mess{"<nil>":""}`,
-		"mess",
+	testStructMsg(t, `mess a ge{"<nil>":""}`,
+		"mess a ge",
 		nil,
 	)
 }
 
 func TestStructMsg_2_nil(t *testing.T) {
-	testStructMsg(t, `mess{"x":"<nil>"}`,
-		"mess",
+	testStructMsg(t, `mess a ge{"x":"<nil>"}`,
+		"mess a ge",
 		"x", nil,
 	)
 }
 
 func TestFormatErrorMessages_A(t *testing.T) {
 	err := getErrors(2)
-	err = errors.WithMessage(err, StructMsg("mess",
+	err = errors.WithMessage(err, StructMsg("mess a ge",
 		"x", 3,
 		"y", "4",
 		"n", nil,
@@ -236,16 +236,16 @@ func TestFormatErrorMessages_A(t *testing.T) {
 	))
 
 	text := replaceCallLine(FormatErrorMessages(err))
-	assert.Equal(t, `mess{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; ERROR 2; ERROR 1; ERROR 0; 
+	assert.Equal(t, `mess a ge{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; ERROR 2; ERROR 1; ERROR 0; 
     util_test.go#0:getErrors()
     util_test.go#0:getErrors()
     util_test.go#0:getErrors()
-    util_test.go#0:TestFormatErrorMessages()`, text)
+    util_test.go#0:TestFormatErrorMessages_A()`, text)
 }
 
 func TestFormatErrorMessages_B(t *testing.T) {
 	err := getErrors(1)
-	err = errors.WithMessage(err, StructMsg("mess",
+	err = errors.WithMessage(err, StructMsg("mess a ge",
 		"x", 3,
 		"y", "4",
 		"n", nil,
@@ -254,14 +254,14 @@ func TestFormatErrorMessages_B(t *testing.T) {
 	err = errors.WithMessage(err, "ERROR 2")
 
 	text := replaceCallLine(FormatErrorMessages(err))
-	assert.Equal(t, `ERROR 2; mess{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; ERROR 1; ERROR 0; 
+	assert.Equal(t, `ERROR 2; mess a ge{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; ERROR 1; ERROR 0; 
     util_test.go#0:getErrors()
     util_test.go#0:getErrors()
     util_test.go#0:TestFormatErrorMessages_B()`, text)
 }
 
 func TestFormatErrorMessages_C(t *testing.T) {
-	err := errors.New(StructMsg("mess",
+	err := errors.New(StructMsg("mess a ge",
 		"x", 3,
 		"y", "4",
 		"n", nil,
@@ -271,11 +271,41 @@ func TestFormatErrorMessages_C(t *testing.T) {
 	err = errors.WithMessage(err, "ERROR 2")
 
 	text := replaceCallLine(FormatErrorMessages(err))
-	assert.Equal(t, `ERROR 2; ERROR 1; mess{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; 
+	assert.Equal(t, `ERROR 2; ERROR 1; mess a ge{"n":"<nil>","s":"{i:4 s:str}","x":"3","y":"4"}; 
     util_test.go#0:TestFormatErrorMessages_C()`, text)
 }
 
 func replaceCallLine(lines string) string {
 	linePattern := regexp.MustCompile(`(?m)#\d*:`)
 	return linePattern.ReplaceAllString(lines, "#0:")
+}
+
+func TestHttpProblem_A(t *testing.T) {
+	err := getErrors(1)
+	err = errors.WithMessage(err, StructMsg("mess a ge",
+		"x", 3,
+		"y", "4",
+		"n", nil,
+		"s", sampleStruct{i: 4, s: "str"},
+	))
+	err = errors.WithMessage(err, "ERROR 2")
+	messages, trace := BuildErrorsLists(err)
+
+	httpProblem := NewHttpProblem(404, messages, trace)
+
+	resp, _ := httpProblem.MarshalPretty()
+	respText := string(resp)
+
+	assert.Equal(t, `{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "ERROR 2",
+  "Errors": [
+    "ERROR 2",
+    "mess a ge{\"n\":\"<nil>\",\"s\":\"{i:4 s:str}\",\"x\":\"3\",\"y\":\"4\"}",
+    "ERROR 1",
+    "ERROR 0"
+  ]
+}`, respText)
 }

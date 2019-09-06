@@ -272,7 +272,7 @@ type HttpProblem struct {
 }
 
 // NewHttpProblem makes a HttpProblem instance
-func NewHttpProblem(status int, messages []string, trace []string) {
+func NewHttpProblem(status int, messages []string, trace []string) *HttpProblem {
 	p := HttpProblem{DefaultProblem: *problems.NewStatusProblem(status)}
 	if len(messages) > 0 {
 		p.DefaultProblem.Detail = messages[0]
@@ -281,4 +281,19 @@ func NewHttpProblem(status int, messages []string, trace []string) {
 
 	// TODO provide it at debug level
 	// p.Stack = trace
+
+	return &p
+}
+
+func (httpProblem *HttpProblem) MarshalPretty() ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	err := encoder.Encode(httpProblem)
+	byteSlice := buffer.Bytes()
+	if len(byteSlice) > 0 && byteSlice[len(byteSlice)-1] == '\n' {
+		byteSlice = byteSlice[:len(byteSlice)-1]
+	}
+	return byteSlice, err
 }
