@@ -1,0 +1,17 @@
+run:
+  skip-dirs:
+    - testdata
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  golint:
+    min-confidence: 0.3
+
+linters:
+  enable:
+    - megacheck
+    - govet
+    - golint
