@@ -50,8 +50,8 @@ func (ds *dummyState) Flag(c int) bool {
 	return false
 }
 
-//nolint:golint
-var messagesReplacer *strings.Replacer = strings.NewReplacer(
+// nolint:gochecknoglobals
+var messagesReplacer = strings.NewReplacer(
 	"%", "%25",
 	";", "%3B",
 )
@@ -132,13 +132,15 @@ func (httpProblem *HTTPProblem) MarshalPretty() ([]byte, error) {
 	return byteSlice, err
 }
 
-var detailsKeyReplacer *strings.Replacer = strings.NewReplacer(
+// nolint:gochecknoglobals
+var detailsKeyReplacer = strings.NewReplacer(
 	"%", "%25",
 	"=", "%3D",
 	" ", "%20",
 )
 
-var detailsValueReplacer *strings.Replacer = strings.NewReplacer(
+// nolint:gochecknoglobals
+var detailsValueReplacer = strings.NewReplacer(
 	"%", "%25",
 	"=", "%3D",
 )
@@ -167,7 +169,7 @@ func buildDetailsList(kvs []interface{}) []string {
 }
 
 func buildStackTraceList(trace stackTracer, skip int) []string {
-	var traceList []string
+	traceList := []string{}
 
 	tracesAll := trace.StackTrace()
 	traces := tracesAll[:len(tracesAll)-skip]

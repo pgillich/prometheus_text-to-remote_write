@@ -8,10 +8,14 @@ linters-settings:
     check-blank: true
 
   golint:
-    min-confidence: 0.3
+    min-confidence: 0.1
 
 linters:
-  enable:
-    - megacheck
-    - govet
-    - golint
+    enable-all: true
+
+issues:
+    exclude-rules:
+        -   text: "package comment should not have leading space"
+            linters:
+                - golint
+                

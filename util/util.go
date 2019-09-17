@@ -1,32 +1,28 @@
 package util
 
 import (
-	//"bytes"
 	"fmt"
 	"os"
-	//"reflect"
 	"runtime"
 	"strings"
 
 	"encoding/json"
 
 	"github.com/golang/glog"
-	//	"github.com/pkg/errors"
-	//"github.com/moogar0880/problems"
 )
 
-func FUNCTION_NAME() string {
+func FunctionName() string {
 	pc, _, _, _ := runtime.Caller(1)
 	return runtime.FuncForPC(pc).Name()
 }
 
-func FUNCTION_NAME_SHORT() string {
+func FunctionNameShort() string {
 	pc, _, _, _ := runtime.Caller(1)
 	longName := runtime.FuncForPC(pc).Name()
 	return longName[strings.LastIndex(longName, "/")+1:]
 }
 
-func CALLER_FUNCTION_NAME() string {
+func CallerFunctionName() string {
 	pc, _, _, _ := runtime.Caller(2)
 	return runtime.FuncForPC(pc).Name()
 }
@@ -38,19 +34,19 @@ func PrintFatalf(format string, args ...interface{}) {
 	glog.Fatalf(format, args...)
 }
 
-func LogObjAsJson(level glog.Level, obj interface{}, name string, indent bool) {
-	var obj_json []byte
+func LogObjAsJSON(level glog.Level, obj interface{}, name string, indent bool) {
+	var objJSON []byte
 	var err error
 
 	if indent {
-		obj_json, err = json.MarshalIndent(obj, "", "  ")
+		objJSON, err = json.MarshalIndent(obj, "", "  ")
 	} else {
-		obj_json, err = json.Marshal(obj)
+		objJSON, err = json.Marshal(obj)
 	}
 
 	if err != nil {
 		glog.V(level).Infof("%s: %s\n", name, err)
 	} else {
-		glog.V(level).Infof("%s: %s\n", name, obj_json)
+		glog.V(level).Infof("%s: %s\n", name, objJSON)
 	}
 }

@@ -27,14 +27,14 @@ import (
 )
 
 func HandlePush(w http.ResponseWriter, req *http.Request) {
-	glog.V(1).Infof("%s: %s %s\n", util.FUNCTION_NAME_SHORT(), req.Method, req.URL.String())
+	glog.V(1).Infof("%s: %s %s\n", util.FunctionNameShort(), req.Method, req.URL.String())
 	switch req.Method {
 	case "PUT", "POST":
 		var parser expfmt.TextParser
 		metricFamilies, _ := parser.TextToMetricFamilies(req.Body)
 
-		glog.V(2).Infof("%s: %v\n", util.FUNCTION_NAME_SHORT(), metricFamilies)
-		util.LogObjAsJson(2, metricFamilies, "metricFamilies", true)
+		glog.V(2).Infof("%s: %v\n", util.FunctionNameShort(), metricFamilies)
+		util.LogObjAsJSON(2, metricFamilies, "metricFamilies", true)
 
 		ProcessSeries(metricFamilies)
 	}
@@ -50,7 +50,7 @@ func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
 	if err != nil {
 		util.PrintFatalf("Runtime error: %+v\n", err)
 	}
-	glog.V(2).Infof("%s: %v\n", util.FUNCTION_NAME_SHORT(), serverURL)
+	glog.V(2).Infof("%s: %v\n", util.FunctionNameShort(), serverURL)
 
 	cc := remote.ClientConfig{
 		URL:     serverURL,
@@ -59,15 +59,15 @@ func ProcessSeries(metricFamilies map[string]*dto.MetricFamily) {
 
 	c, err := remote.NewClient(0, &cc)
 	if err != nil {
-		glog.Warningf("%s: Client error: %+v\n", util.FUNCTION_NAME_SHORT(), err)
+		glog.Warningf("%s: Client error: %+v\n", util.FunctionNameShort(), err)
 		return
 	}
 
 	writeRequest := SeriesToWriteRequest(labelsToSeries)
-	util.LogObjAsJson(2, writeRequest, "writeRequest", true)
+	util.LogObjAsJSON(2, writeRequest, "writeRequest", true)
 	err = c.Store(context.Background(), writeRequest)
 	if err != nil {
-		glog.Warningf("%s: Store error: %+v\n", util.FUNCTION_NAME_SHORT(), err)
+		glog.Warningf("%s: Store error: %+v\n", util.FunctionNameShort(), err)
 	}
 }
 
@@ -78,7 +78,7 @@ func SeriesToWriteRequest(series map[string]prompb.TimeSeries) *prompb.WriteRequ
 	}
 
 	for _, s := range series {
-		glog.V(2).Infof("%s: serie %v\n", util.FUNCTION_NAME_SHORT(), s)
+		glog.V(2).Infof("%s: serie %v\n", util.FunctionNameShort(), s)
 		req.Timeseries = append(req.Timeseries, s)
 	}
 
@@ -90,18 +90,18 @@ func SeriesToWriteRequest(series map[string]prompb.TimeSeries) *prompb.WriteRequ
 func mergeMetrics(labelsToSeries map[string]prompb.TimeSeries, metricFamilies map[string]*dto.MetricFamily) error {
 	for _, m := range metricFamilies {
 		name := m.GetName()
-		glog.V(2).Infof("%s: name = %v (%v)\n", util.FUNCTION_NAME_SHORT(), name, m.String())
+		glog.V(2).Infof("%s: name = %v (%v)\n", util.FunctionNameShort(), name, m.String())
 		switch m.GetType() {
 		case dto.MetricType_HISTOGRAM, dto.MetricType_SUMMARY:
-			glog.Warningf("%s: Not supported metric type: %v, %v\n", util.FUNCTION_NAME_SHORT(),
+			glog.Warningf("%s: Not supported metric type: %v, %v\n", util.FunctionNameShort(),
 				m.String(), m,
 			)
 			continue
 		}
 		for _, s := range m.GetMetric() {
-			glog.V(2).Infof("%s: s.GetLabel() = %v\n", util.FUNCTION_NAME_SHORT(), s.GetLabel())
+			glog.V(2).Infof("%s: s.GetLabel() = %v\n", util.FunctionNameShort(), s.GetLabel())
 			k := concatLabels(name, s.GetLabel())
-			glog.V(2).Infof("%s: k = %v\n", util.FUNCTION_NAME_SHORT(), k)
+			glog.V(2).Infof("%s: k = %v\n", util.FunctionNameShort(), k)
 			ts, ok := labelsToSeries[k]
 			if !ok {
 				ts = prompb.TimeSeries{
@@ -124,13 +124,13 @@ func mergeMetrics(labelsToSeries map[string]prompb.TimeSeries, metricFamilies ma
 				Timestamp: s.GetTimestampMs(),
 				Value:     value,
 			})
-			glog.V(2).Infof("%s: ts = %v (%v)\n", util.FUNCTION_NAME_SHORT(), ts, m.String())
+			glog.V(2).Infof("%s: ts = %v (%v)\n", util.FunctionNameShort(), ts, m.String())
 		}
-		glog.V(2).Infof("%s:\n labelsToSeries = %v\n\n", util.FUNCTION_NAME_SHORT(), labelsToSeries)
+		glog.V(2).Infof("%s:\n labelsToSeries = %v\n\n", util.FunctionNameShort(), labelsToSeries)
 
 	}
 
-	util.LogObjAsJson(2, labelsToSeries, "labelsToSeries", true)
+	util.LogObjAsJSON(2, labelsToSeries, "labelsToSeries", true)
 
 	return nil
 }
