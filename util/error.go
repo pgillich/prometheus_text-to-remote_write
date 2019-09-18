@@ -9,11 +9,14 @@ import (
 	"encoding/json"
 
 	"emperror.dev/errors"
+	"emperror.dev/errors/utils/keyval"
 	"github.com/moogar0880/problems"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
-	SkipFirstStackLines = 2
+	SkipFirstStackLines      = 2
+	MessagesDetailsSeparator = " | "
 )
 
 type stackTracer interface {
@@ -50,17 +53,18 @@ func (ds *dummyState) Flag(c int) bool {
 	return false
 }
 
-// nolint:gochecknoglobals
-var messagesReplacer = strings.NewReplacer(
-	"%", "%25",
-	";", "%3B",
-)
+func ErrorsHandleLogrus(logger *log.Logger, err error) {
+	entry := logger.WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
+	entry.Message = "MessagE"
+	entry.Info(err)
+	return
+}
 
 func ErrorsFormatConsole(err error) string {
 	var str strings.Builder
 
-	str.WriteString(messagesReplacer.Replace(fmt.Sprintf("%s", err)))
-	str.WriteString("; ")
+	str.WriteString(fmt.Sprintf("%s", err))
+	str.WriteString(MessagesDetailsSeparator)
 	str.WriteString(strings.Join(buildDetailsList(errors.GetDetails(err)), " "))
 
 	var trace stackTracer
