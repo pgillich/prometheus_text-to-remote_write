@@ -9,11 +9,10 @@ require (
 	github.com/golang/snappy v0.0.1
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/moogar0880/problems v0.1.1
-	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.6.0
 	github.com/prometheus/prometheus v2.11.2+incompatible
-	github.com/sirupsen/logrus v1.2.0
+	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0

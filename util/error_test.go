@@ -112,12 +112,14 @@ func (l *LoggerMock) exit(code int) {
 
 func newLoggerMock() *LoggerMock {
 	buf := new(bytes.Buffer)
+	formatter := TextFormatterTrace{log.TextFormatter{
+		DisableSorting:   true,
+		CallerPrettyfier: CallerPrettyfierFunc,
+	}}
 	logger := &LoggerMock{
 		Logger: &log.Logger{
-			Out: buf,
-			Formatter: &log.TextFormatter{
-				DisableSorting: true,
-			},
+			Out:          buf,
+			Formatter:    &formatter,
 			Hooks:        make(log.LevelHooks),
 			Level:        log.InfoLevel,
 			ExitFunc:     nil,
@@ -126,6 +128,22 @@ func newLoggerMock() *LoggerMock {
 		outBuf:   buf,
 		exitCode: -1,
 	}
+	/*
+		logger := &LoggerMock{
+			Logger: &log.Logger{
+				Out: buf,
+				Formatter: &log.TextFormatter{
+					DisableSorting: true,
+				},
+				Hooks:        make(log.LevelHooks),
+				Level:        log.InfoLevel,
+				ExitFunc:     nil,
+				ReportCaller: true,
+			},
+			outBuf:   buf,
+			exitCode: -1,
+		}
+	*/
 	logger.ExitFunc = logger.exit
 
 	return logger
@@ -136,6 +154,7 @@ func TestErrorsHandleLogrus(t *testing.T) {
 	err := makeDeepErrors()
 
 	ErrorsHandleLogrus(loggerMock.Logger, err)
+	fmt.Println(loggerMock.outBuf.String())
 	assert.Equal(t, "", loggerMock.outBuf.String())
 }
 

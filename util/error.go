@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"encoding/json"
@@ -53,11 +54,74 @@ func (ds *dummyState) Flag(c int) bool {
 	return false
 }
 
+// nolint:gochecknoglobals
+var moduleNamePrefix string
+
+func TrimModuleNamePrefix(path string) string {
+	if len(moduleNamePrefix) == 0 {
+		moduleNamePrefix = reflect.TypeOf(TextFormatterTrace{}).PkgPath()
+		moduleNamePrefix = moduleNamePrefix[:strings.LastIndex(moduleNamePrefix, "/")+1]
+
+	}
+
+	return strings.TrimPrefix(path, moduleNamePrefix)
+}
+
+// nolint:gochecknoglobals
+var modulePathPrefix string
+
+func TrimModulePathPrefix(path string) string {
+
+	if len(modulePathPrefix) == 0 {
+		_, modulePathPrefix, _, _ := runtime.Caller(0)
+		modulePathPrefix = modulePathPrefix[:strings.LastIndex(modulePathPrefix, "/")]
+		// nolint:staticcheck
+		modulePathPrefix = modulePathPrefix[:strings.LastIndex(modulePathPrefix, "/")+1]
+	}
+
+	return strings.TrimPrefix(path, modulePathPrefix)
+}
+
+type TextFormatterTrace struct {
+	log.TextFormatter
+}
+
+func (f *TextFormatterTrace) Format(entry *log.Entry) ([]byte, error) {
+	textPart, err := f.TextFormatter.Format(entry)
+
+	textPart = append(textPart, []byte("\n\tXXX\n\tYYY")...)
+
+	return textPart, err
+}
+
+func CallerPrettyfierFunc(frame *runtime.Frame) (function string, file string) {
+	type empty struct{}
+	pkgPath := reflect.TypeOf(empty{}).PkgPath()
+	fmt.Printf("%+v\n", pkgPath)
+
+	pc, fileC, _, _ := runtime.Caller(0)
+	f := runtime.FuncForPC(pc)
+	fmt.Printf("Entry=%+v pc=%+v file=%+v Name=%+v\n", f.Entry(), pc, fileC, f.Name())
+
+	return frame.Function, pkgPath
+}
+
+func CallerPrettyfierFuncFile(frame *runtime.Frame) (function string, file string) {
+	return frame.Function, fmt.Sprintf("%s:%d", frame.File, frame.Line)
+}
+
 func ErrorsHandleLogrus(logger *log.Logger, err error) {
 	entry := logger.WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
 	entry.Message = "MessagE"
-	entry.Info(err)
-	return
+	var trace stackTracer
+	if errors.As(err, &trace) {
+		traceList := buildStackTraceList(trace, SkipFirstStackLines)
+		tracePart := strings.Join(traceList, "\n\t")
+		fmt.Println(tracePart)
+		entry.Infof("%s\n\t%s", err, tracePart)
+	} else {
+		entry.Info(err)
+	}
 }
 
 func ErrorsFormatConsole(err error) string {
