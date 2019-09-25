@@ -110,16 +110,13 @@ func (l *LoggerMock) exit(code int) {
 	l.exitCode = code
 }
 
-func newLoggerMock() *LoggerMock {
+func newLoggerMock(formatter log.Formatter) *LoggerMock {
+
 	buf := new(bytes.Buffer)
-	formatter := TextFormatterTrace{log.TextFormatter{
-		DisableSorting:   true,
-		CallerPrettyfier: CallerPrettyfierFunc,
-	}}
 	logger := &LoggerMock{
 		Logger: &log.Logger{
 			Out:          buf,
-			Formatter:    &formatter,
+			Formatter:    formatter,
 			Hooks:        make(log.LevelHooks),
 			Level:        log.InfoLevel,
 			ExitFunc:     nil,
@@ -128,34 +125,81 @@ func newLoggerMock() *LoggerMock {
 		outBuf:   buf,
 		exitCode: -1,
 	}
-	/*
-		logger := &LoggerMock{
-			Logger: &log.Logger{
-				Out: buf,
-				Formatter: &log.TextFormatter{
-					DisableSorting: true,
-				},
-				Hooks:        make(log.LevelHooks),
-				Level:        log.InfoLevel,
-				ExitFunc:     nil,
-				ReportCaller: true,
-			},
-			outBuf:   buf,
-			exitCode: -1,
-		}
-	*/
+
 	logger.ExitFunc = logger.exit
 
 	return logger
 }
 
+func testSortingFuncDecorator(t *testing.T,
+	fieldOrder map[string]int,
+	expected []string,
+	items []string,
+) {
+	sorter := SortingFuncDecorator(fieldOrder)
+	sorter(items)
+	assert.Equal(t, expected, items)
+}
+
+func TestSortingFuncDecorator(t *testing.T) {
+	type testCase struct {
+		fieldOrder map[string]int
+		expected   []string
+		items      []string
+	}
+
+	testCases := []testCase{
+		{
+			map[string]int{},
+			[]string{"a", "b", "c", "x", "y", "z"},
+			[]string{"a", "b", "c", "x", "y", "z"},
+		},
+		{
+			map[string]int{},
+			[]string{"a", "b", "c", "x", "y", "z"},
+			[]string{"x", "b", "y", "a", "c", "z"},
+		},
+		{
+			map[string]int{},
+			[]string{"a", "b", "c", "x", "y", "z"},
+			[]string{"z", "y", "x", "c", "b", "a"},
+		},
+		{
+			map[string]int{"c": 1, "z": 2},
+			[]string{"z", "c", "a", "b", "x", "y"},
+			[]string{"z", "y", "x", "c", "b", "a"},
+		},
+		{
+			map[string]int{"c": 1, "z": 2, "b": 3, "N": 5},
+			[]string{"b", "z", "c", "a", "x", "y"},
+			[]string{"z", "y", "x", "c", "b", "a"},
+		},
+		{
+			map[string]int{"c": 2, "z": 2, "b": 2},
+			[]string{"b", "c", "z", "a", "x", "y"},
+			[]string{"z", "y", "x", "c", "b", "a"},
+		},
+	}
+
+	for _, test := range testCases {
+		testSortingFuncDecorator(t, test.fieldOrder, test.expected, test.items)
+	}
+}
+
 func TestErrorsHandleLogrus(t *testing.T) {
-	loggerMock := newLoggerMock()
+	formatter := NewAdvancedTextFormatter(2)
+	formatter.TimestampFormat = "TIME:STAMP"
+	loggerMock := newLoggerMock(formatter)
 	err := makeDeepErrors()
 
-	ErrorsHandleLogrus(loggerMock.Logger, err)
-	fmt.Println(loggerMock.outBuf.String())
-	assert.Equal(t, "", loggerMock.outBuf.String())
+	ErrorsHandleLogrus(loggerMock.Logger, log.ErrorLevel, err)
+	fmt.Printf("###\n%s\n###\n", loggerMock.outBuf.String())
+	// nolint:lll
+	assert.Equal(t, `level=error time="TIME:STAMP" func=util.ErrorsHandleLogrus msg="MESSAGE 4: MESSAGE:2: MESSAGE%0" file="util/error.go:0" K0_1=V0_1 K0_2=V0_2 K1_1=V1_1 K1_2=V1_2 K3 2="V3 space" K3"5="V3\"doublequote" K3%6="V3%percent" K3:3="V3:column" K3;3="V3;semicolumn" K3=1="V3=equal" K5_bool=true K5_int=12 K5_struct="{text 42 true hidden}"
+	github.com/pgillich/prometheus_text-to-remote_write/util.newWithDetails() error_test.go:0
+	github.com/pgillich/prometheus_text-to-remote_write/util.makeDeepErrors() error_test.go:0
+	github.com/pgillich/prometheus_text-to-remote_write/util.TestErrorsHandleLogrus() error_test.go:0
+`, replaceCallLine(loggerMock.outBuf.String()))
 }
 
 func TestConsoleFormatting(t *testing.T) {

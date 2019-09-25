@@ -1,10 +1,12 @@
-package util
+package util //nolint:golint
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 
 	"encoding/json"
@@ -16,8 +18,8 @@ import (
 )
 
 const (
-	SkipFirstStackLines      = 2
 	MessagesDetailsSeparator = " | "
+	ContextKeyStackTrace     = "stacktrace"
 )
 
 type stackTracer interface {
@@ -57,11 +59,12 @@ func (ds *dummyState) Flag(c int) bool {
 // nolint:gochecknoglobals
 var moduleNamePrefix string
 
+// nolint:golint
 func TrimModuleNamePrefix(path string) string {
 	if len(moduleNamePrefix) == 0 {
-		moduleNamePrefix = reflect.TypeOf(TextFormatterTrace{}).PkgPath()
-		moduleNamePrefix = moduleNamePrefix[:strings.LastIndex(moduleNamePrefix, "/")+1]
-
+		moduleNameTrimming := reflect.TypeOf(AdvancedTextFormatter{}).PkgPath()
+		// module full name + '/'
+		moduleNamePrefix = moduleNameTrimming[:strings.LastIndex(moduleNameTrimming, "/")+1]
 	}
 
 	return strings.TrimPrefix(path, moduleNamePrefix)
@@ -70,84 +73,156 @@ func TrimModuleNamePrefix(path string) string {
 // nolint:gochecknoglobals
 var modulePathPrefix string
 
+// nolint:golint
 func TrimModulePathPrefix(path string) string {
-
 	if len(modulePathPrefix) == 0 {
-		_, modulePathPrefix, _, _ := runtime.Caller(0)
-		modulePathPrefix = modulePathPrefix[:strings.LastIndex(modulePathPrefix, "/")]
-		// nolint:staticcheck
-		modulePathPrefix = modulePathPrefix[:strings.LastIndex(modulePathPrefix, "/")+1]
+		_, modulePathTrimming, _, _ := runtime.Caller(0)
+		// this package is under the module level
+		modulePathTrimming = modulePathTrimming[:strings.LastIndex(modulePathTrimming, "/")]
+		// module path + '/'
+		modulePathPrefix = modulePathTrimming[:strings.LastIndex(modulePathTrimming, "/")+1]
 	}
 
 	return strings.TrimPrefix(path, modulePathPrefix)
 }
 
-type TextFormatterTrace struct {
+// nolint:golint
+type AdvancedTextFormatter struct {
 	log.TextFormatter
+
+	/* StackLinesSkip
+	If 0, stack traces are NOT printed
+	If >0, stack traces are printed, skipping the first set lines
+		so, the main() will never be printed.
+	*/
+	StackLinesSkip int
 }
 
-func (f *TextFormatterTrace) Format(entry *log.Entry) ([]byte, error) {
+// nolint:golint
+func NewAdvancedTextFormatter(stackLinesSkip int) *AdvancedTextFormatter {
+	return &AdvancedTextFormatter{
+		TextFormatter: log.TextFormatter{
+			CallerPrettyfier: ModuleCallerPrettyfier,
+			SortingFunc:      SortingFuncDecorator(AdvancedFieldOrder()),
+		},
+		StackLinesSkip: stackLinesSkip,
+	}
+}
+
+// nolint:golint
+func (f *AdvancedTextFormatter) Format(entry *log.Entry) ([]byte, error) {
 	textPart, err := f.TextFormatter.Format(entry)
 
-	textPart = append(textPart, []byte("\n\tXXX\n\tYYY")...)
+	if entry.Context != nil {
+		if stackValue := entry.Context.Value(ContextKeyStackTrace); stackValue != nil {
+			if stackList, ok := stackValue.([]string); ok {
+				stackList = stackList[:len(stackList)-f.StackLinesSkip]
+				textPart = append(textPart, '\t')
+				textPart = append(textPart,
+					[]byte(strings.Join(stackList, "\n\t"))...,
+				)
+				textPart = append(textPart, '\n')
+			}
+		}
+	}
 
 	return textPart, err
 }
 
-func CallerPrettyfierFunc(frame *runtime.Frame) (function string, file string) {
-	type empty struct{}
-	pkgPath := reflect.TypeOf(empty{}).PkgPath()
-	fmt.Printf("%+v\n", pkgPath)
-
-	pc, fileC, _, _ := runtime.Caller(0)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("Entry=%+v pc=%+v file=%+v Name=%+v\n", f.Entry(), pc, fileC, f.Name())
-
-	return frame.Function, pkgPath
+// nolint:golint
+type EntryFieldSorter struct {
+	items      []string
+	fieldOrder map[string]int
 }
 
-func CallerPrettyfierFuncFile(frame *runtime.Frame) (function string, file string) {
-	return frame.Function, fmt.Sprintf("%s:%d", frame.File, frame.Line)
+func (sorter EntryFieldSorter) Len() int { return len(sorter.items) }
+func (sorter EntryFieldSorter) Swap(i, j int) {
+	sorter.items[i], sorter.items[j] = sorter.items[j], sorter.items[i]
+}
+func (sorter EntryFieldSorter) Less(i, j int) bool {
+	iWeight := sorter.weight(i)
+	jWeight := sorter.weight(j)
+	if iWeight == jWeight {
+		return sorter.items[i] < sorter.items[j]
+	}
+	return iWeight > jWeight
+}
+func (sorter EntryFieldSorter) weight(i int) int {
+	if weight, ok := sorter.fieldOrder[sorter.items[i]]; ok {
+		return weight
+	}
+	return -1
 }
 
-func ErrorsHandleLogrus(logger *log.Logger, err error) {
-	entry := logger.WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
-	entry.Message = "MessagE"
-	var trace stackTracer
-	if errors.As(err, &trace) {
-		traceList := buildStackTraceList(trace, SkipFirstStackLines)
-		tracePart := strings.Join(traceList, "\n\t")
-		fmt.Println(tracePart)
-		entry.Infof("%s\n\t%s", err, tracePart)
-	} else {
-		entry.Info(err)
+// nolint:golint
+func AdvancedFieldOrder() map[string]int {
+	return map[string]int{
+		log.FieldKeyLevel:       100,
+		log.FieldKeyTime:        90,
+		log.FieldKeyFunc:        80,
+		log.FieldKeyMsg:         70,
+		log.FieldKeyLogrusError: 60,
+		log.FieldKeyFile:        50,
 	}
 }
 
-func ErrorsFormatConsole(err error) string {
-	var str strings.Builder
+// nolint:golint
+func SortingFuncDecorator(fieldOrder map[string]int) func([]string) {
+	return func(keys []string) {
+		sorter := EntryFieldSorter{keys, fieldOrder}
+		sort.Sort(sorter)
+	}
+}
 
-	str.WriteString(fmt.Sprintf("%s", err))
-	str.WriteString(MessagesDetailsSeparator)
-	str.WriteString(strings.Join(buildDetailsList(errors.GetDetails(err)), " "))
+// nolint:golint
+func ModuleCallerPrettyfier(frame *runtime.Frame) (function string, file string) {
+	function = TrimModuleNamePrefix(frame.Function)
+	file = fmt.Sprintf("%s:%d", TrimModulePathPrefix(frame.File), frame.Line)
+	return
+}
+
+// nolint:golint
+func ErrorsHandleLogrus(logger *log.Logger, level log.Level, err error) {
+	var entry *log.Entry
 
 	var trace stackTracer
 	if errors.As(err, &trace) {
-		traceList := buildStackTraceList(trace, SkipFirstStackLines)
+		traceCtx := context.WithValue(context.Background(),
+			ContextKeyStackTrace, buildStackTraceList(trace),
+		)
+		entry = logger.WithContext(traceCtx).WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
+	} else {
+		entry = logger.WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
+	}
+	entry.Log(level, err)
+}
+
+// nolint:golint
+func ErrorsFormatConsole(err error) string {
+	var str strings.Builder
+
+	str.WriteString(fmt.Sprintf("%s", err))                                      //nolint:gosec
+	str.WriteString(MessagesDetailsSeparator)                                    //nolint:gosec
+	str.WriteString(strings.Join(buildDetailsList(errors.GetDetails(err)), " ")) //nolint:gosec
+
+	var trace stackTracer
+	if errors.As(err, &trace) {
+		traceList := buildStackTraceList(trace)
 		for _, line := range traceList {
-			str.WriteString("\n\t")
-			str.WriteString(line)
+			str.WriteString("\n\t") //nolint:gosec
+			str.WriteString(line)   //nolint:gosec
 		}
 	}
 
 	return str.String()
 }
 
+// nolint:golint
 func ErrorsFormatRfc7807(err error, status int, addTrace bool) []byte {
 	traceList := []string{}
 	var trace stackTracer
 	if addTrace && errors.As(err, &trace) {
-		traceList = buildStackTraceList(trace, SkipFirstStackLines)
+		traceList = buildStackTraceList(trace)
 	}
 
 	httpProblem := NewHTTPProblem(
@@ -187,6 +262,7 @@ func NewHTTPProblem(status int, title string, message string, details []string, 
 	return &p
 }
 
+// nolint:golint
 func (httpProblem *HTTPProblem) MarshalPretty() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
@@ -236,19 +312,18 @@ func buildDetailsList(kvs []interface{}) []string {
 	return detailsList
 }
 
-func buildStackTraceList(trace stackTracer, skip int) []string {
+func buildStackTraceList(trace stackTracer) []string {
 	traceList := []string{}
 
-	tracesAll := trace.StackTrace()
-	traces := tracesAll[:len(tracesAll)-skip]
+	traces := trace.StackTrace()
 	for _, t := range traces {
 		ds0 := dummyState{flags: map[int]bool{'+': true}}
 		t.Format(&ds0, 's')
 		ds := dummyState{}
-		ds.str.WriteString(strings.Split(ds0.str.String(), "\n")[0])
-		ds.str.WriteString("() ")
+		ds.str.WriteString(strings.Split(ds0.str.String(), "\n")[0]) //nolint:gosec
+		ds.str.WriteString("() ")                                    //nolint:gosec
 		t.Format(&ds, 's')
-		ds.str.WriteString(":")
+		ds.str.WriteString(":") //nolint:gosec
 		t.Format(&ds, 'd')
 
 		traceList = append(traceList, ds.str.String())
@@ -265,6 +340,7 @@ func digErrorsString(err error) string {
 	return err.Error()
 }
 
+// nolint:golint
 func GetFieldString(input interface{}, keyName string) *string {
 	if input == nil {
 		return nil

@@ -1,0 +1,31 @@
+run:
+  skip-dirs:
+    - testdata
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gocyclo:
+    min-complexity: 10
+  golint:
+    min-confidence: 0
+  govet:
+    check-shadowing: true
+  goconst:
+    min-occurrences: 4
+  gofmt:
+    simplify: true
+
+linters:
+    enable-all: true
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - text: "package comment should not have leading space"
+      linters:
+        - golint
+
+# https://git.tedomum.net/tedomum/traefik/blob/master/.golangci.toml
+# https://www.wandouip.com/t5i281287/
