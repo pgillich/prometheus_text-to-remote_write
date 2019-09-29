@@ -18,10 +18,8 @@ import (
 )
 
 const (
-	//nolint:golint
 	MessagesDetailsSeparator = " | "
-	//nolint:golint
-	ContextKeyStackTrace = "stacktrace"
+	ContextKeyStackTrace     = "stacktrace"
 )
 
 type stackTracer interface {
@@ -64,7 +62,7 @@ var moduleNamePrefix string
 // nolint:golint
 func TrimModuleNamePrefix(path string) string {
 	if len(moduleNamePrefix) == 0 {
-		moduleNameTrimming := reflect.TypeOf(FormatterDecorator{}).PkgPath()
+		moduleNameTrimming := reflect.TypeOf(AdvancedTextFormatter{}).PkgPath()
 		// module full name + '/'
 		moduleNamePrefix = moduleNameTrimming[:strings.LastIndex(moduleNameTrimming, "/")+1]
 	}
@@ -89,42 +87,36 @@ func TrimModulePathPrefix(path string) string {
 }
 
 // nolint:golint
-type FormatterDecorator struct {
-	format func(entry *log.Entry) ([]byte, error)
+type AdvancedTextFormatter struct {
+	log.TextFormatter
+
+	/* StackLinesSkip
+	If 0, stack traces are NOT printed
+	If >0, stack traces are printed, skipping the first set lines
+		so, the main() will never be printed.
+	*/
+	StackLinesSkip int
 }
 
 // nolint:golint
-func (f *FormatterDecorator) Format(entry *log.Entry) ([]byte, error) {
-	return f.format(entry)
-}
-
-// nolint:golint
-func NewTextFormatter(stackLinesSkip int) log.Formatter {
-	formatter, _ := NewTextFormatterTesting(stackLinesSkip)
-	return formatter
-}
-
-// nolint:golint
-func NewTextFormatterTesting(stackLinesSkip int) (log.Formatter, *log.TextFormatter) {
-	textFormatter := log.TextFormatter{
-		CallerPrettyfier: ModuleCallerPrettyfier,
-		SortingFunc:      SortingFuncDecorator(AdvancedFieldOrder()),
-	}
-
-	return &FormatterDecorator{
-		format: func(entry *log.Entry) ([]byte, error) {
-			return textFormat(&textFormatter, stackLinesSkip, entry)
+func NewAdvancedTextFormatter(stackLinesSkip int) *AdvancedTextFormatter {
+	return &AdvancedTextFormatter{
+		TextFormatter: log.TextFormatter{
+			CallerPrettyfier: ModuleCallerPrettyfier,
+			SortingFunc:      SortingFuncDecorator(AdvancedFieldOrder()),
 		},
-	}, &textFormatter
+		StackLinesSkip: stackLinesSkip,
+	}
 }
 
-func textFormat(tf log.Formatter, stackLinesSkip int, entry *log.Entry) ([]byte, error) {
-	textPart, err := tf.Format(entry)
+// nolint:golint
+func (f *AdvancedTextFormatter) Format(entry *log.Entry) ([]byte, error) {
+	textPart, err := f.TextFormatter.Format(entry)
 
 	if entry.Context != nil {
 		if stackValue := entry.Context.Value(ContextKeyStackTrace); stackValue != nil {
 			if stackList, ok := stackValue.([]string); ok {
-				stackList = stackList[:len(stackList)-stackLinesSkip]
+				stackList = stackList[:len(stackList)-f.StackLinesSkip]
 				textPart = append(textPart, '\t')
 				textPart = append(textPart,
 					[]byte(strings.Join(stackList, "\n\t"))...,

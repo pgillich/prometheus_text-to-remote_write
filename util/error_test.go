@@ -187,8 +187,8 @@ func TestSortingFuncDecorator(t *testing.T) {
 }
 
 func TestErrorsHandleLogrus(t *testing.T) {
-	formatter, origFormatter := NewTextFormatterTesting(2)
-	origFormatter.TimestampFormat = "TIME:STAMP"
+	formatter := NewAdvancedTextFormatter(2)
+	formatter.TimestampFormat = "TIME:STAMP"
 	loggerMock := newLoggerMock(formatter)
 	err := makeDeepErrors()
 
