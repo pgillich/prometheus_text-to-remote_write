@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"strconv"
 	"testing"
 
 	"net/http"
@@ -20,7 +21,8 @@ func replaceCallLine(lines string) string {
 }
 
 func newWithDetails() error {
-	return errors.NewWithDetails("MESSAGE%0", "K0_1", "V0_1", "K0_2", "V0_2")
+	_, err := strconv.Atoi("NO_NUMBER")
+	return errors.WrapWithDetails(err, "MESSAGE%0", "K0_1", "V0_1", "K0_2", "V0_2")
 }
 
 func makeDeepErrors() error {
@@ -76,7 +78,7 @@ func TestMessages(t *testing.T) {
 	err := makeDeepErrors()
 
 	text := fmt.Sprintf("%s", err)
-	assert.Equal(t, "MESSAGE 4: MESSAGE:2: MESSAGE%0", text)
+	assert.Equal(t, `MESSAGE 4: MESSAGE:2: MESSAGE%0: strconv.Atoi: parsing "NO_NUMBER": invalid syntax`, text)
 }
 
 func TestDetails(t *testing.T) {
@@ -110,25 +112,18 @@ func (l *LoggerMock) exit(code int) {
 	l.exitCode = code
 }
 
-func newLoggerMock(formatter log.Formatter) *LoggerMock {
-
+func newTextLoggerMock() (*LoggerMock, *AdvancedTextFormatter) {
+	logger, formatter := NewTextLoggerFormatter(log.InfoLevel)
 	buf := new(bytes.Buffer)
-	logger := &LoggerMock{
-		Logger: &log.Logger{
-			Out:          buf,
-			Formatter:    formatter,
-			Hooks:        make(log.LevelHooks),
-			Level:        log.InfoLevel,
-			ExitFunc:     nil,
-			ReportCaller: true,
-		},
+	loggerMock := &LoggerMock{
+		Logger:   logger,
 		outBuf:   buf,
 		exitCode: -1,
 	}
+	loggerMock.Out = buf
+	loggerMock.ExitFunc = loggerMock.exit
 
-	logger.ExitFunc = logger.exit
-
-	return logger
+	return loggerMock, formatter
 }
 
 func testSortingFuncDecorator(t *testing.T,
@@ -187,21 +182,38 @@ func TestSortingFuncDecorator(t *testing.T) {
 }
 
 func TestErrorsHandleLogrus(t *testing.T) {
-	formatter := NewAdvancedTextFormatter(2)
-	formatter.TimestampFormat = "TIME:STAMP"
-	loggerMock := newLoggerMock(formatter)
+	funcName := FunctionNameShort()
+	loggerMock, formatter := newTextLoggerMock()
+	formatter.TimestampFormat = "8008-08-08T08:08:08Z"
+
 	err := makeDeepErrors()
 
-	ErrorsHandleLogrus(loggerMock.Logger, log.ErrorLevel, err)
+	ErrorsHandleLogrus(loggerMock.Logger, log.ErrorLevel, err, 2, false)
 	fmt.Printf("###\n%s\n###\n", loggerMock.outBuf.String())
 	// nolint:lll
-	assert.Equal(t, `level=error time="TIME:STAMP" func=util.ErrorsHandleLogrus msg="MESSAGE 4: MESSAGE:2: MESSAGE%0" file="util/error.go:0" K0_1=V0_1 K0_2=V0_2 K1_1=V1_1 K1_2=V1_2 K3 2="V3 space" K3"5="V3\"doublequote" K3%6="V3%percent" K3:3="V3:column" K3;3="V3;semicolumn" K3=1="V3=equal" K5_bool=true K5_int=12 K5_struct="{text 42 true hidden}"
+	assert.Equal(t, `level=error time="8008-08-08T08:08:08Z" func=`+funcName+` msg="MESSAGE 4: MESSAGE:2: MESSAGE%0: strconv.Atoi: parsing \"NO_NUMBER\": invalid syntax" file="error_test.go:0" K0_1=V0_1 K0_2=V0_2 K1_1=V1_1 K1_2=V1_2 K3 2="V3 space" K3"5="V3\"doublequote" K3%6="V3%percent" K3:3="V3:column" K3;3="V3;semicolumn" K3=1="V3=equal" K5_bool=true K5_int=12 K5_struct="{\"Text\":\"text\",\"Integer\":42,\"Bool\":true}"
 	github.com/pgillich/prometheus_text-to-remote_write/util.newWithDetails() error_test.go:0
 	github.com/pgillich/prometheus_text-to-remote_write/util.makeDeepErrors() error_test.go:0
-	github.com/pgillich/prometheus_text-to-remote_write/util.TestErrorsHandleLogrus() error_test.go:0
+	github.com/pgillich/prometheus_text-to-remote_write/`+funcName+`() error_test.go:0
 `, replaceCallLine(loggerMock.outBuf.String()))
 }
 
+func TestErrorsHandleLogrus_CallStackInFields(t *testing.T) {
+	funcName := FunctionNameShort()
+	loggerMock, formatter := newTextLoggerMock()
+	formatter.TimestampFormat = "8008-08-08T08:08:08Z"
+
+	err := makeDeepErrors()
+
+	ErrorsHandleLogrus(loggerMock.Logger, log.ErrorLevel, err, 2, true)
+	fmt.Printf("###\n%s\n###\n", loggerMock.outBuf.String())
+	// nolint:lll
+	assert.Equal(t, `level=error time="8008-08-08T08:08:08Z" func=`+funcName+` msg="MESSAGE 4: MESSAGE:2: MESSAGE%0: strconv.Atoi: parsing \"NO_NUMBER\": invalid syntax" file="error_test.go:0" K0_1=V0_1 K0_2=V0_2 K1_1=V1_1 K1_2=V1_2 K3 2="V3 space" K3"5="V3\"doublequote" K3%6="V3%percent" K3:3="V3:column" K3;3="V3;semicolumn" K3=1="V3=equal" K5_bool=true K5_int=12 K5_struct="{\"Text\":\"text\",\"Integer\":42,\"Bool\":true}" callstack="[\"github.com/pgillich/prometheus_text-to-remote_write/util.newWithDetails() error_test.go:0\",\"github.com/pgillich/prometheus_text-to-remote_write/util.makeDeepErrors() error_test.go:0\",\"github.com/pgillich/prometheus_text-to-remote_write/util.TestErrorsHandleLogrus_CallStackInFields() error_test.go:0\"]"
+`, replaceCallLine(loggerMock.outBuf.String()))
+}
+
+// nolint:lll
+/*
 func TestConsoleFormatting(t *testing.T) {
 	err := makeDeepErrors()
 
@@ -215,7 +227,7 @@ func TestConsoleFormatting(t *testing.T) {
 		replaceCallLine(text),
 	)
 }
-
+*/
 func TestRfc7807Formatting(t *testing.T) {
 	err := makeDeepErrors()
 

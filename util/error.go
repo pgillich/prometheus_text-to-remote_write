@@ -18,12 +18,145 @@ import (
 )
 
 const (
+	//nolint:golint
 	MessagesDetailsSeparator = " | "
-	ContextKeyStackTrace     = "stacktrace"
+	//nolint:golint
+	KeyCallStack = "callstack"
+	//nolint:golint
+	MaximumCallerDepth = 25
 )
 
-type stackTracer interface {
+//nolint:golint
+type StackTracer interface {
 	StackTrace() errors.StackTrace
+}
+
+type contextLogFieldKey string
+
+//nolint:golint
+func NewTextLoggerFormatter(level log.Level) (*log.Logger, *AdvancedTextFormatter) {
+	skipPackageNameForCaller := map[string]struct{}{}
+	callerName := CallerFunctionName()
+	if i := strings.LastIndex(callerName, "/"); i > 0 {
+		skipPackageNameForCaller[callerName[:i+1]] = struct{}{}
+	}
+
+	textFormatter := NewAdvancedTextFormatter(skipPackageNameForCaller)
+	logger := &log.Logger{
+		Formatter:    textFormatter,
+		Hooks:        make(log.LevelHooks),
+		Level:        level,
+		ReportCaller: true,
+	}
+
+	parentCallerHook := ParentCallerHook{1}
+	logger.AddHook(&parentCallerHook)
+
+	return logger, textFormatter
+}
+
+/*ErrorsHandleLogrus is a text formatter
+callStackLinesSkip
+If 0, call stack lines are NOT printed
+If >0, call stack lines are printed, skipping the first set lines
+	so, the main() will never be printed.
+*/
+func ErrorsHandleLogrus(logger *log.Logger, level log.Level, err error,
+	callStackLinesSkip int, callStackInFields bool,
+) {
+	var entry *log.Entry
+	fieldsRaw := keyval.ToMap(errors.GetDetails(err))
+	fields := map[string]interface{}{}
+	for key, value := range fieldsRaw {
+		fields[key] = value
+		if val := reflect.ValueOf(value); val.IsValid() {
+			if val.Kind() != reflect.String {
+				if json, jsonErr := json.Marshal(value); jsonErr == nil {
+					fields[key] = string(json)
+				}
+			}
+		}
+	}
+
+	var stackTracer StackTracer
+	if callStackLinesSkip > 0 && errors.As(err, &stackTracer) {
+		callStackLines := buildCallStackLines(stackTracer)
+		if len(callStackLines) > callStackLinesSkip {
+			callStackLines = callStackLines[:len(callStackLines)-callStackLinesSkip]
+			if callStackInFields {
+				if json, jsonErr := json.Marshal(callStackLines); jsonErr == nil {
+					fields[KeyCallStack] = string(json)
+				}
+			} else {
+				ctxCallStack := context.WithValue(context.Background(),
+					contextLogFieldKey(KeyCallStack), callStackLines,
+				)
+				entry = logger.WithContext(ctxCallStack).WithFields(log.Fields(fields))
+				entry.Log(level, err)
+				return
+			}
+		}
+	}
+
+	entry = logger.WithFields(log.Fields(fields))
+	entry.Log(level, err)
+}
+
+// nolint:golint
+type AdvancedTextFormatter struct {
+	log.TextFormatter
+}
+
+// nolint:golint
+func NewAdvancedTextFormatter(skipPackageNameForCaller map[string]struct{}) *AdvancedTextFormatter {
+	return &AdvancedTextFormatter{
+		TextFormatter: log.TextFormatter{
+			CallerPrettyfier: ModuleCallerPrettyfierDecorator(skipPackageNameForCaller),
+			SortingFunc:      SortingFuncDecorator(AdvancedFieldOrder()),
+			DisableColors:    true,
+			QuoteEmptyFields: true,
+		},
+	}
+}
+
+// nolint:golint
+func (f *AdvancedTextFormatter) Format(entry *log.Entry) ([]byte, error) {
+	textPart, err := f.TextFormatter.Format(entry)
+
+	if entry.Context != nil {
+		if callStack := entry.Context.Value(contextLogFieldKey(KeyCallStack)); callStack != nil {
+			if callStackLines, ok := callStack.([]string); ok {
+				textPart = append(textPart, '\t')
+				textPart = append(textPart,
+					[]byte(strings.Join(callStackLines, "\n\t"))...,
+				)
+				textPart = append(textPart, '\n')
+			}
+		}
+	}
+
+	return textPart, err
+}
+
+// nolint:golint
+func AdvancedFieldOrder() map[string]int {
+	return map[string]int{
+		log.FieldKeyLevel:       100, // first
+		log.FieldKeyTime:        90,
+		log.FieldKeyFunc:        80,
+		log.FieldKeyMsg:         70,
+		log.FieldKeyLogrusError: 60,
+		log.FieldKeyFile:        50,
+		KeyCallStack:            -2, // after normal fields (-1)
+	}
+}
+
+// nolint:golint
+func SortingFuncDecorator(fieldOrder map[string]int) func([]string) {
+	return func(keys []string) {
+		sorter := EntryFieldSorter{keys, fieldOrder}
+		sort.Sort(sorter)
+	}
 }
 
 // dummyState is a dummy fmt.State implementation
@@ -56,77 +189,43 @@ func (ds *dummyState) Flag(c int) bool {
 	return false
 }
 
-// nolint:gochecknoglobals
-var moduleNamePrefix string
+/* Similar pull request:
+https://github.com/sirupsen/logrus/pull/973
+*/
+// nolint:golint
+type ParentCallerHook struct {
+	ParentCount int
+}
 
 // nolint:golint
-func TrimModuleNamePrefix(path string) string {
-	if len(moduleNamePrefix) == 0 {
-		moduleNameTrimming := reflect.TypeOf(AdvancedTextFormatter{}).PkgPath()
-		// module full name + '/'
-		moduleNamePrefix = moduleNameTrimming[:strings.LastIndex(moduleNameTrimming, "/")+1]
+func (*ParentCallerHook) Levels() []log.Level {
+	return log.AllLevels
+}
+
+// nolint:golint
+func (h *ParentCallerHook) Fire(entry *log.Entry) error {
+	if h.ParentCount <= 0 || entry.Caller == nil {
+		return nil
 	}
 
-	return strings.TrimPrefix(path, moduleNamePrefix)
-}
+	pcs := make([]uintptr, MaximumCallerDepth)
+	depth := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:depth])
 
-// nolint:gochecknoglobals
-var modulePathPrefix string
-
-// nolint:golint
-func TrimModulePathPrefix(path string) string {
-	if len(modulePathPrefix) == 0 {
-		_, modulePathTrimming, _, _ := runtime.Caller(0)
-		// this package is under the module level
-		modulePathTrimming = modulePathTrimming[:strings.LastIndex(modulePathTrimming, "/")]
-		// module path + '/'
-		modulePathPrefix = modulePathTrimming[:strings.LastIndex(modulePathTrimming, "/")+1]
-	}
-
-	return strings.TrimPrefix(path, modulePathPrefix)
-}
-
-// nolint:golint
-type AdvancedTextFormatter struct {
-	log.TextFormatter
-
-	/* StackLinesSkip
-	If 0, stack traces are NOT printed
-	If >0, stack traces are printed, skipping the first set lines
-		so, the main() will never be printed.
-	*/
-	StackLinesSkip int
-}
-
-// nolint:golint
-func NewAdvancedTextFormatter(stackLinesSkip int) *AdvancedTextFormatter {
-	return &AdvancedTextFormatter{
-		TextFormatter: log.TextFormatter{
-			CallerPrettyfier: ModuleCallerPrettyfier,
-			SortingFunc:      SortingFuncDecorator(AdvancedFieldOrder()),
-		},
-		StackLinesSkip: stackLinesSkip,
-	}
-}
-
-// nolint:golint
-func (f *AdvancedTextFormatter) Format(entry *log.Entry) ([]byte, error) {
-	textPart, err := f.TextFormatter.Format(entry)
-
-	if entry.Context != nil {
-		if stackValue := entry.Context.Value(ContextKeyStackTrace); stackValue != nil {
-			if stackList, ok := stackValue.([]string); ok {
-				stackList = stackList[:len(stackList)-f.StackLinesSkip]
-				textPart = append(textPart, '\t')
-				textPart = append(textPart,
-					[]byte(strings.Join(stackList, "\n\t"))...,
-				)
-				textPart = append(textPart, '\n')
-			}
+	var parentCount = MaximumCallerDepth - 1
+	var f runtime.Frame
+	var again bool
+	for f, again = frames.Next(); again && parentCount > 0; f, again = frames.Next() {
+		if f == *entry.Caller {
+			parentCount = h.ParentCount
 		}
+		parentCount--
+	}
+	if again { // for loop exited by parentCount == 0
+		entry.Caller = &f // nolint:scopelint
 	}
 
-	return textPart, err
+	return nil
 }
 
 // nolint:golint
@@ -154,75 +253,35 @@ func (sorter EntryFieldSorter) weight(i int) int {
 	return -1
 }
 
-// nolint:golint
-func AdvancedFieldOrder() map[string]int {
-	return map[string]int{
-		log.FieldKeyLevel:       100,
-		log.FieldKeyTime:        90,
-		log.FieldKeyFunc:        80,
-		log.FieldKeyMsg:         70,
-		log.FieldKeyLogrusError: 60,
-		log.FieldKeyFile:        50,
-	}
-}
-
-// nolint:golint
-func SortingFuncDecorator(fieldOrder map[string]int) func([]string) {
-	return func(keys []string) {
-		sorter := EntryFieldSorter{keys, fieldOrder}
-		sort.Sort(sorter)
-	}
-}
-
-// nolint:golint
-func ModuleCallerPrettyfier(frame *runtime.Frame) (function string, file string) {
-	function = TrimModuleNamePrefix(frame.Function)
-	file = fmt.Sprintf("%s:%d", TrimModulePathPrefix(frame.File), frame.Line)
-	return
-}
-
-// nolint:golint
-func ErrorsHandleLogrus(logger *log.Logger, level log.Level, err error) {
-	var entry *log.Entry
-
-	var trace stackTracer
-	if errors.As(err, &trace) {
-		traceCtx := context.WithValue(context.Background(),
-			ContextKeyStackTrace, buildStackTraceList(trace),
-		)
-		entry = logger.WithContext(traceCtx).WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
-	} else {
-		entry = logger.WithFields(log.Fields(keyval.ToMap(errors.GetDetails(err))))
-	}
-	entry.Log(level, err)
-}
-
-// nolint:golint
-func ErrorsFormatConsole(err error) string {
-	var str strings.Builder
-
-	str.WriteString(fmt.Sprintf("%s", err))                                      //nolint:gosec
-	str.WriteString(MessagesDetailsSeparator)                                    //nolint:gosec
-	str.WriteString(strings.Join(buildDetailsList(errors.GetDetails(err)), " ")) //nolint:gosec
-
-	var trace stackTracer
-	if errors.As(err, &trace) {
-		traceList := buildStackTraceList(trace)
-		for _, line := range traceList {
-			str.WriteString("\n\t") //nolint:gosec
-			str.WriteString(line)   //nolint:gosec
+/*ModuleCallerPrettyfierDecorator similar pull requests:
+https://github.com/sirupsen/logrus/pull/989
+*/
+func ModuleCallerPrettyfierDecorator(skipPackageNameForCaller map[string]struct{},
+) func(frame *runtime.Frame) (string, string) {
+	return func(frame *runtime.Frame) (string, string) {
+		filePath := frame.File
+		if i := strings.LastIndex(filePath, "/"); i >= 0 {
+			filePath = filePath[i+1:]
 		}
-	}
 
-	return str.String()
+		functionName := frame.Function
+		for prefix := range skipPackageNameForCaller {
+			if strings.HasPrefix(functionName, prefix) {
+				functionName = strings.TrimPrefix(functionName, prefix)
+				break
+			}
+		}
+
+		return functionName, fmt.Sprintf("%s:%d", filePath, frame.Line)
+	}
 }
 
 // nolint:golint
-func ErrorsFormatRfc7807(err error, status int, addTrace bool) []byte {
-	traceList := []string{}
-	var trace stackTracer
-	if addTrace && errors.As(err, &trace) {
-		traceList = buildStackTraceList(trace)
+func ErrorsFormatRfc7807(err error, status int, addCallStack bool) []byte {
+	callStackLines := []string{}
+	var stackTracer StackTracer
+	if addCallStack && errors.As(err, &stackTracer) {
+		callStackLines = buildCallStackLines(stackTracer)
 	}
 
 	httpProblem := NewHTTPProblem(
@@ -230,7 +289,7 @@ func ErrorsFormatRfc7807(err error, status int, addTrace bool) []byte {
 		digErrorsString(err),
 		fmt.Sprintf("%s", err),
 		buildDetailsList(errors.GetDetails(err)),
-		traceList,
+		callStackLines,
 	)
 
 	resp, err := httpProblem.MarshalPretty()
@@ -243,12 +302,12 @@ func ErrorsFormatRfc7807(err error, status int, addTrace bool) []byte {
 // HTTPProblem is RFC-7807 comliant response
 type HTTPProblem struct {
 	problems.DefaultProblem
-	Details []string `json:"details,omitempty"`
-	Stack   []string `json:"stack,omitempty"`
+	Details   []string `json:"details,omitempty"`
+	CallStack []string `json:"callstack,omitempty"`
 }
 
 // NewHTTPProblem makes a HTTPProblem instance
-func NewHTTPProblem(status int, title string, message string, details []string, trace []string) *HTTPProblem {
+func NewHTTPProblem(status int, title string, message string, details []string, callStack []string) *HTTPProblem {
 	p := HTTPProblem{
 		DefaultProblem: problems.DefaultProblem{
 			Type:   problems.DefaultURL,
@@ -256,8 +315,8 @@ func NewHTTPProblem(status int, title string, message string, details []string, 
 			Status: status,
 			Detail: message,
 		},
-		Details: details,
-		Stack:   trace,
+		Details:   details,
+		CallStack: callStack,
 	}
 	return &p
 }
@@ -312,24 +371,28 @@ func buildDetailsList(kvs []interface{}) []string {
 	return detailsList
 }
 
-func buildStackTraceList(trace stackTracer) []string {
-	traceList := []string{}
+func buildCallStackLines(stackTracer StackTracer) []string {
+	callStackLines := []string{}
 
-	traces := trace.StackTrace()
-	for _, t := range traces {
-		ds0 := dummyState{flags: map[int]bool{'+': true}}
-		t.Format(&ds0, 's')
-		ds := dummyState{}
-		ds.str.WriteString(strings.Split(ds0.str.String(), "\n")[0]) //nolint:gosec
-		ds.str.WriteString("() ")                                    //nolint:gosec
-		t.Format(&ds, 's')
-		ds.str.WriteString(":") //nolint:gosec
-		t.Format(&ds, 'd')
+	stackTrace := stackTracer.StackTrace()
+	for _, t := range stackTrace {
+		dsFunction := dummyState{flags: map[int]bool{'+': true}}
+		t.Format(&dsFunction, 's')
+		//functionName := TrimModuleNamePrefix(strings.Split(dsFunction.str.String(), "\n")[0])
+		functionName := strings.Split(dsFunction.str.String(), "\n")[0]
 
-		traceList = append(traceList, ds.str.String())
+		dsPath := dummyState{}
+		t.Format(&dsPath, 's')
+		path := dsPath.str.String()
+
+		dsLine := dummyState{}
+		t.Format(&dsLine, 'd')
+		line := dsLine.str.String()
+
+		callStackLines = append(callStackLines, fmt.Sprintf("%s() %s:%s", functionName, path, line))
 	}
 
-	return traceList
+	return callStackLines
 }
 
 func digErrorsString(err error) string {
