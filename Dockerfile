@@ -1,4 +1,4 @@
-ARG GOLANG_VERSION=1.10-alpine
+ARG GOLANG_VERSION=1.15-alpine
 FROM golang:${GOLANG_VERSION} as builder
 LABEL maintainer "pgillich ta gmail.com"
 

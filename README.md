@@ -12,43 +12,49 @@ See background info at [Details](doc/details.md).
 
 Docker images are pushed to Docker hub: [pgillich/prometheus_text-to-remote_write](https://hub.docker.com/r/pgillich/prometheus_text-to-remote_write/)
 
-*It's in alpha phase. No automatic tests and source code should be refactored. If you would like to improve it, you are welcomed! ;-)*
+Warning: *It's in alpha phase. No automatic tests and source code should be refactored. If you would like to improve it, you are welcomed! ;-)*
 
-# Protocols
+## Protocols
 
-The service expects Prometheus text expose format, described here: https://prometheus.io/docs/instrumenting/exposition_formats/
+The service expects Prometheus text expose format, described here: <https://prometheus.io/docs/instrumenting/exposition_formats/>
 
 Example for the receiving input:
-```
+
+```text
 storage_used{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",Mount="/"} 3756675072 1484564635000
 storage_used_p{DC="operator.com",Network="prom-lab",Region="R170",Host="host-1",Mount="/"} 7.1 1484564635000
 ```
 
 The service sends data to target on Prometheus remote_write protocol.
 
-# Supported metric types
+## Supported metric types
 
 Below metric types are supported:
+
 * Counter
 * Gauge
 * Untyped (Counter or Gauge)
 
 Below metric types are NOT supported:
+
 * Histogram
 * Summary
 
-# Usage
+## Usage
 
 Service can be started as a container, for example (with default env variables):
-```
+
+```sh
 docker run --rm -P --env RECEIVE_ON=':9099' --env RECEIVE_PATH='/' \
     --env WRITE_TO='http://influxdb:8086/api/v1/prom/write?u=prom&p=prom&db=prometheus' --env GLOG_V=0 \
-	pgillich/prometheus_text-to-remote_write
+    pgillich/prometheus_text-to-remote_write
 ```
+
 The default exposed port is 9099.
 
 Example for starting container for testing, see [Testing](#Testing) below:
-```
+
+```sh
 docker run --rm -P --env WRITE_TO="http://172.17.0.1:1234/receive" --env GLOG_V=2 pgillich/prometheus_text-to-remote_write
 ```
 
@@ -67,11 +73,12 @@ Mapping CLI options to environment variables (including Glog):
 | stderrthreshold | GLOG_STDERRTHRESHOLD |
 | vmodule | GLOG_VMODULE |
 
-# Repo config
+## Repo config
 
 A subdirectory from Prometheus repo (prometheus/documentation/examples/remote_storage/example_write_adapter) is linked for making test target.
 FYI, below commands were executed (you don't have to do it):
-```
+
+```sh
 git clone https://github.com/pgillich/prometheus_text-to-remote_write.git
 cd prometheus_text-to-remote_write/
 git remote add -f -t release-2.22 --no-tags prometheus https://github.com/prometheus/prometheus.git
@@ -80,33 +87,41 @@ git add .
 git commit -m 'Linking Prometheus example_write_adapter'
 git push
 ```
-See more details: https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree
 
-# Build
+See more details: <https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree>
+
+## Build
 
 Docker image can be built by following command:
-```
+
+```sh
 docker build -t pgillich/prometheus_text-to-remote_write:vA.B .
 ```
+
 Where A.B is the version number
 
 Binary executable can be built by following command:
-```
+
+```sh
 go build
 ```
 
-# Testing
+## Testing
 
 Binary executable can be tested without any real DB backend by github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter, for example (in separated shells):
-```
-~/go/src/github.com/prometheus/prometheus/documentation/examples/remote_storage/example_write_adapter$ ./example_write_adapter
 
-~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ ./prometheus_text-to-remote_write service --write-to "http://172.17.0.1:1234/receive" --v 2
+```sh
+go build -o example_write_adapter/example_write_adapter example_write_adapter/server.go
+example_write_adapter/example_write_adapter
 
-~/go/src/github.com/pgillich/prometheus_text-to-remote_write$ curl -X PUT --data-binary @testdata/sample-2.txt localhost:9099
+go build
+./prometheus_text-to-remote_write service --write-to "http://172.17.0.1:1234/receive" --v 2
+
+curl -X PUT --data-binary @testdata/sample-2.txt localhost:9099
 ```
+
 If it runs in container, the target address should be the container IP address, instead of `localhost`.
 
-# Version info
+## Version info
 
 See: `go.mod`
