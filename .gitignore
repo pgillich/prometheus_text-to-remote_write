@@ -3,7 +3,6 @@
 
 *.debug
 prometheus_text-to-remote_write
-example_write_adapter
 
 .vscode
 
